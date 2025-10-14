@@ -22,14 +22,29 @@ dotenv.config();
 
 const app = new Hono<{ Variables: { user: import('./types/context.js').AuthUser } }>();
 
+// CORS middleware - must be first to handle preflight requests
+app.use('*', cors({
+  origin: [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    process.env.FRONTEND_URL || 'http://localhost:5173'
+  ].filter(Boolean),
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowHeaders: [
+    'Content-Type',
+    'Authorization',
+    'Accept',
+    'Origin',
+    'X-Requested-With'
+  ],
+  credentials: true,
+  maxAge: 86400, // 24 hours
+}));
+
 // Global middleware
 app.use('*', logger());
 app.use('*', prettyJSON());
 app.use('*', secureHeaders());
-app.use('*', cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-  credentials: true,
-}));
 
 // Health check endpoint
 app.get('/health', (c) => {

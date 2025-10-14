@@ -5,7 +5,7 @@ export interface AuthUser {
   id: string;
   email: string;
   role: string;
-  businessId: string;
+  businessId?: string;
 }
 
 // Extend Hono's context to include our custom variables

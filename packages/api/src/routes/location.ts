@@ -77,6 +77,11 @@ location.get('/drivers', async (c) => {
       return ResponseHandler.forbidden(c, 'Insufficient permissions');
     }
 
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
+    }
+
     const drivers = await LocationService.getDriversWithLocations(user.businessId);
     return ResponseHandler.success(c, { drivers });
 
@@ -100,6 +105,11 @@ location.get('/order/:orderId', async (c) => {
 
     if (user.role !== 'business_owner' && user.role !== 'admin') {
       return ResponseHandler.forbidden(c, 'Insufficient permissions');
+    }
+
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
     }
 
     const result = await LocationService.getOrderLocationHistory(orderId, user.businessId);

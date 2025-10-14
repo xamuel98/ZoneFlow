@@ -6,10 +6,13 @@ type OrderStatus = Order['status']
 type OrderPriority = Order['priority']
 
 interface OrdersResponse {
-  orders: Order[]
-  total: number
-  page: number
-  limit: number
+  data: Order[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
 }
 
 interface CreateOrderData {

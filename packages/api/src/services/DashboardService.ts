@@ -4,7 +4,6 @@ import {
   ActivityItem,
   MapData,
   DriverPerformance,
-  NotFoundError,
   ForbiddenError,
   ServiceError
 } from '../types/services.js';
@@ -41,14 +40,8 @@ export class DashboardService {
         WHERE business_id = ?
       `).get(businessId) as any;
 
-      // Get revenue (assuming there's a price field or calculate based on delivery fee)
-      const revenueData = db.prepare(`
-        SELECT 
-          COALESCE(SUM(delivery_fee), 0) as total_revenue
-        FROM orders 
-        WHERE business_id = ? AND status = 'delivered' 
-        AND created_at >= datetime('now', '-' || ? || ' days')
-      `).get(businessId, period) as any;
+      // Get revenue (placeholder since delivery_fee column doesn't exist yet)
+      const revenueData = { total_revenue: 0 };
 
       // Get average delivery time
       const deliveryTimeData = db.prepare(`

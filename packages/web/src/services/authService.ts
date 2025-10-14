@@ -24,7 +24,8 @@ class AuthService {
   }
 
   async getProfile(): Promise<User> {
-    return apiService.get('/api/auth/me')
+    const response = await apiService.get<{ user: User }>('/api/auth/me')
+    return response.user
   }
 
   async refreshToken(): Promise<string> {

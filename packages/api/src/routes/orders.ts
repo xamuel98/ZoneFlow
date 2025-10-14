@@ -30,6 +30,11 @@ orders.get('/', async (c) => {
       offset: (page - 1) * limit,
     };
 
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
+    }
+
     const result = await OrderService.getOrders(user.businessId, filters, pagination);
 
     return ResponseHandler.success(c, result);
@@ -50,6 +55,11 @@ orders.get('/:id', async (c) => {
   try {
     const user = c.get('user');
     const orderId = c.req.param('id');
+
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
+    }
 
     const result = await OrderService.getOrderById(orderId, user.businessId);
 
@@ -77,6 +87,11 @@ orders.post('/', async (c) => {
     const body = await c.req.json();
     const data = validateRequest(createOrderSchema, body) as CreateOrderData;
 
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
+    }
+
     const result = await OrderService.createOrder(data, user.businessId);
 
     return ResponseHandler.created(c, { order: result });
@@ -103,6 +118,11 @@ orders.patch('/:id/status', async (c) => {
     const orderId = c.req.param('id');
     const body = await c.req.json();
     const data = validateRequest(updateOrderStatusSchema, body) as UpdateOrderStatusData;
+
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
+    }
 
     const result = await OrderService.updateOrderStatus(orderId, data, user.businessId);
 
@@ -136,6 +156,11 @@ orders.patch('/:id/assign', async (c) => {
 
     if (!driverId) {
       return ResponseHandler.badRequest(c, 'Driver ID is required');
+    }
+
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
     }
 
     const result = await OrderService.assignDriver(orderId, driverId, user.businessId);
@@ -191,6 +216,11 @@ orders.patch('/:id/cancel', async (c) => {
     const user = c.get('user');
     const orderId = c.req.param('id');
     const { reason } = await c.req.json();
+
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
+    }
 
     const result = await OrderService.cancelOrder(orderId, user.businessId, reason);
 

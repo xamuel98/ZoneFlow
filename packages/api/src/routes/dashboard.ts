@@ -18,6 +18,11 @@ dashboard.get('/stats', async (c) => {
     // Validate permissions
     DashboardService.validateDashboardAccess(user.role);
 
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
+    }
+
     const stats = await DashboardService.getStats(user.businessId, period);
 
     return ResponseHandler.success(c, stats);
@@ -46,6 +51,11 @@ dashboard.get('/activity', async (c) => {
     // Validate permissions
     DashboardService.validateDashboardAccess(user.role);
 
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
+    }
+
     const activity = await DashboardService.getActivity(user.businessId, limit);
 
     return ResponseHandler.success(c, { activity });
@@ -72,6 +82,11 @@ dashboard.get('/map', async (c) => {
 
     // Validate permissions
     DashboardService.validateDashboardAccess(user.role);
+
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
+    }
 
     const mapData = await DashboardService.getMapData(user.businessId);
 
@@ -100,6 +115,11 @@ dashboard.get('/drivers/performance', async (c) => {
 
     // Validate permissions
     DashboardService.validateDashboardAccess(user.role);
+
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
+    }
 
     const driverPerformance = await DashboardService.getDriverPerformance(user.businessId, period);
 

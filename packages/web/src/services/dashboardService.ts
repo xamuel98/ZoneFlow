@@ -4,22 +4,28 @@ import { apiService } from './api'
 interface DashboardStats {
   totalOrders: number
   activeOrders: number
+  completedOrders: number
+  cancelledOrders: number
   totalDrivers: number
-  availableDrivers: number
-  totalGeofences: number
-  ordersByStatus: Record<string, number>
-  ordersByPriority: Record<string, number>
-  recentOrders: Order[]
-  deliveryPerformance: {
-    onTimeDeliveries: number
+  activeDrivers: number
+  totalRevenue: number
+  avgDeliveryTime: number
+  orderMetrics: {
+    pending: number
+    in_progress: number
+    completed: number
+    cancelled: number
+  }
+  deliveryMetrics: {
+    onTime: number
+    delayed: number
     totalDeliveries: number
-    averageDeliveryTime: number
   }
   topDrivers: Array<{
     id: string
     name: string
     completedOrders: number
-    averageRating: number
+    avgRating: number
   }>
 }
 

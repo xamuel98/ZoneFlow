@@ -3,12 +3,11 @@ import { MapPin, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Map from '../components/Map'
-import { geofencesService } from '../services/geofencesService'
+import { geofencesService, type BackendGeofence } from '../services/geofencesService'
 import { formatDate } from '../utils/format'
-import type { Geofence } from '@zoneflow/shared'
 
 const Geofences = () => {
-  const [geofences, setGeofences] = useState<Geofence[]>([])
+  const [geofences, setGeofences] = useState<BackendGeofence[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -105,17 +104,15 @@ const Geofences = () => {
                       <div>
                         <p className="text-sm font-medium text-gray-900">{geofence.name}</p>
                         <p className="text-xs text-gray-500">
-                          {geofence.type === 'circle' ? 
-                            `Circle - Radius: ${geofence.radius}m` : 
-                            'Polygon area'
-                          }
+                          Radius: {geofence.radius}m
                         </p>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`status-badge ${
-                        geofence.type === 'circle' ? 'bg-blue-100 text-blue-800' :
-                        geofence.type === 'polygon' ? 'bg-green-100 text-green-800' :
+                        geofence.type === 'pickup' ? 'bg-blue-100 text-blue-800' :
+                        geofence.type === 'delivery' ? 'bg-green-100 text-green-800' :
+                        geofence.type === 'restricted' ? 'bg-red-100 text-red-800' :
                         'bg-purple-100 text-purple-800'
                       }`}>
                         {geofence.type}
@@ -128,12 +125,12 @@ const Geofences = () => {
                       <button
                         onClick={() => handleToggleGeofence(geofence.id)}
                         className={`status-badge ${
-                          geofence.active 
+                          geofence.is_active 
                             ? 'bg-green-100 text-green-800' 
                             : 'bg-gray-100 text-gray-800'
                         }`}
                       >
-                        {geofence.active ? 'Active' : 'Inactive'}
+                        {geofence.is_active ? 'Active' : 'Inactive'}
                       </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

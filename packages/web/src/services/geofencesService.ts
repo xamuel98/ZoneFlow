@@ -1,32 +1,46 @@
 import type { Geofence } from '@zoneflow/shared'
 import { apiService } from './api'
 
-// Define types that are used in the service
-type GeofenceType = Geofence['type']
-
-interface CreateGeofenceData {
+export interface CreateGeofenceData {
   name: string
-  type: GeofenceType
-  latitude: number
-  longitude: number
-  radius: number
-  description?: string
+  type: 'circle' | 'polygon'
+  center_lat?: number
+  center_lng?: number
+  radius?: number
+  coordinates?: Array<{ lat: number; lng: number }>
+  triggers: string[]
 }
 
-interface GeofenceWithEvents extends Geofence {
-  recent_events: Array<{
+// Backend geofence type that matches the actual API response
+export interface BackendGeofence {
+  id: string
+  name: string
+  type: 'pickup' | 'delivery' | 'restricted' | 'custom'
+  center_lat: number
+  center_lng: number
+  radius: number
+  coordinates: Array<{ lat: number; lng: number }> | null
+  triggers: string[]
+  is_active: boolean
+  business_id: string
+  created_at: string
+  updated_at: string
+}
+
+export interface GeofenceWithEvents extends Geofence {
+  events?: Array<{
     id: string
-    event_type: 'enter' | 'exit'
+    type: string
     timestamp: string
-    driver_name: string
+    driver_id?: string
     order_id?: string
-    tracking_code?: string
   }>
 }
 
 class GeofencesService {
-  async getGeofences(type?: GeofenceType): Promise<Geofence[]> {
-    return apiService.get('/api/geofences', type ? { type } : {})
+  async getGeofences(type?: BackendGeofence['type']): Promise<BackendGeofence[]> {
+    const response = await apiService.get('/api/geofences', type ? { type } : {}) as { geofences: BackendGeofence[] }
+    return response.geofences
   }
 
   async getGeofence(id: string): Promise<GeofenceWithEvents> {

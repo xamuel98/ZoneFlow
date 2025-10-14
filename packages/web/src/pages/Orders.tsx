@@ -29,7 +29,7 @@ const Orders = () => {
         status: statusFilter || undefined,
         priority: priorityFilter || undefined,
       })
-      setOrders(response.orders)
+      setOrders(response.data)
     } catch (error: any) {
       toast.error('Failed to load orders')
       console.error('Orders error:', error)

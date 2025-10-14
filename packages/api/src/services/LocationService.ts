@@ -4,7 +4,6 @@ import {
   LocationData,
   LocationHistory,
   NotFoundError,
-  ValidationError,
   ServiceError
 } from '../types/services.js';
 

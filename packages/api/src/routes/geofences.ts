@@ -16,6 +16,11 @@ geofences.get('/', async (c) => {
     const user = c.get('user');
     const type = c.req.query('type');
 
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
+    }
+
     const geofenceList = await GeofenceService.getGeofences(user.businessId, type);
     return ResponseHandler.success(c, { geofences: geofenceList });
 
@@ -33,6 +38,11 @@ geofences.get('/:id', async (c) => {
   try {
     const user = c.get('user');
     const geofenceId = c.req.param('id');
+
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
+    }
 
     const result = await GeofenceService.getGeofenceById(geofenceId, user.businessId);
     return ResponseHandler.success(c, result);
@@ -55,6 +65,11 @@ geofences.post('/', async (c) => {
     const user = c.get('user');
     const body = await c.req.json();
     const data = validateRequest(createGeofenceSchema, body);
+
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
+    }
 
     const geofence = await GeofenceService.createGeofence(data, user.businessId);
 
@@ -80,6 +95,11 @@ geofences.put('/:id', async (c) => {
     const body = await c.req.json();
     const data = validateRequest(createGeofenceSchema, body);
 
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
+    }
+
     const geofence = await GeofenceService.updateGeofence(geofenceId, data, user.businessId);
     return ResponseHandler.success(c, { geofence });
 
@@ -104,6 +124,11 @@ geofences.delete('/:id', async (c) => {
     const user = c.get('user');
     const geofenceId = c.req.param('id');
 
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
+    }
+
     await GeofenceService.deleteGeofence(geofenceId, user.businessId);
     return ResponseHandler.success(c, null, 'Geofence deleted successfully');
 
@@ -124,6 +149,11 @@ geofences.patch('/:id/toggle', async (c) => {
   try {
     const user = c.get('user');
     const geofenceId = c.req.param('id');
+
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
+    }
 
     const geofence = await GeofenceService.toggleGeofenceStatus(geofenceId, user.businessId);
     return ResponseHandler.success(c, { geofence });
@@ -148,6 +178,11 @@ geofences.post('/check', async (c) => {
 
     if (!latitude || !longitude || !driverId) {
       return ResponseHandler.badRequest(c, 'Latitude, longitude, and driverId are required');
+    }
+
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
     }
 
     const triggeredGeofences = await GeofenceService.checkGeofenceEntry(

@@ -205,7 +205,7 @@ export class AuthService {
   static async refreshToken(token: string): Promise<{ token: string }> {
     try {
       // Verify current token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
         userId: string;
         email: string;
         role: string;
@@ -263,7 +263,7 @@ export class AuthService {
   }> {
     try {
       // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
         userId: string;
         email: string;
         role: string;
