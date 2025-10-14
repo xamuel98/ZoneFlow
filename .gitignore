@@ -139,3 +139,6 @@ out/
 # Temporary files
 tmp/
 temp/
+
+# Trae AI files
+.trae/
