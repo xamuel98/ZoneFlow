@@ -1,79 +1,61 @@
 import { Hono } from 'hono';
-import { generateId, calculateDistance } from '@zoneflow/shared';
-import db from '../database/connection.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { validateRequest, createGeofenceSchema } from '../utils/validation.js';
+import { ResponseHandler } from '../utils/response.js';
+import { GeofenceService } from '../services/GeofenceService.js';
+import { ServiceError, NotFoundError, ValidationError } from '../types/services.js';
 
-const geofences = new Hono();
+const geofences = new Hono<{ Variables: { user: import('../types/context.js').AuthUser } }>();
 
 // Apply auth middleware to all routes
 geofences.use('*', authMiddleware);
 
-// Get all geofences for a business
+// Get all geofences
 geofences.get('/', async (c) => {
   try {
     const user = c.get('user');
     const type = c.req.query('type');
 
-    let query = 'SELECT * FROM geofences WHERE business_id = ?';
-    const params: any[] = [user.businessId];
-
-    if (type) {
-      query += ' AND type = ?';
-      params.push(type);
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
     }
 
-    query += ' ORDER BY created_at DESC';
+    const geofenceList = await GeofenceService.getGeofences(user.businessId, type);
+    return ResponseHandler.success(c, { geofences: geofenceList });
 
-    const geofencesData = db.prepare(query).all(...params);
-
-    return c.json({
-      success: true,
-      data: { geofences: geofencesData },
-    });
-
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Get geofences error:', error);
-    return c.json({ error: 'Failed to fetch geofences' }, 500);
+    if (error instanceof ServiceError) {
+      return ResponseHandler.serverError(c, error.message);
+    }
+    return ResponseHandler.serverError(c, 'Failed to fetch geofences');
   }
 });
 
-// Get single geofence
+// Get single geofence with recent events
 geofences.get('/:id', async (c) => {
   try {
     const user = c.get('user');
     const geofenceId = c.req.param('id');
 
-    const geofence = db.prepare('SELECT * FROM geofences WHERE id = ? AND business_id = ?')
-      .get(geofenceId, user.businessId);
-
-    if (!geofence) {
-      return c.json({ error: 'Geofence not found' }, 404);
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
     }
 
-    // Get recent events for this geofence
-    const events = db.prepare(`
-      SELECT ge.*, d.user_id as driver_user_id, u.name as driver_name, o.tracking_code
-      FROM geofence_events ge
-      LEFT JOIN drivers d ON ge.driver_id = d.id
-      LEFT JOIN users u ON d.user_id = u.id
-      LEFT JOIN orders o ON ge.order_id = o.id
-      WHERE ge.geofence_id = ?
-      ORDER BY ge.timestamp DESC
-      LIMIT 20
-    `).all(geofenceId);
+    const result = await GeofenceService.getGeofenceById(geofenceId, user.businessId);
+    return ResponseHandler.success(c, result);
 
-    return c.json({
-      success: true,
-      data: {
-        geofence,
-        events,
-      },
-    });
-
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Get geofence error:', error);
-    return c.json({ error: 'Failed to fetch geofence' }, 500);
+    if (error instanceof NotFoundError) {
+      return ResponseHandler.notFound(c, 'Geofence');
+    }
+    if (error instanceof ServiceError) {
+      return ResponseHandler.serverError(c, error.message);
+    }
+    return ResponseHandler.serverError(c, 'Failed to fetch geofence');
   }
 });
 
@@ -84,29 +66,24 @@ geofences.post('/', async (c) => {
     const body = await c.req.json();
     const data = validateRequest(createGeofenceSchema, body);
 
-    const geofenceId = generateId();
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
+    }
 
-    db.prepare(`
-      INSERT INTO geofences (
-        id, business_id, name, type, center_latitude, center_longitude, radius
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      geofenceId, user.businessId, data.name, data.type,
-      data.centerLatitude, data.centerLongitude, data.radius
-    );
+    const geofence = await GeofenceService.createGeofence(data, user.businessId);
 
-    const newGeofence = db.prepare('SELECT * FROM geofences WHERE id = ?').get(geofenceId);
+    return ResponseHandler.success(c, { geofence }, 'Geofence created successfully');
 
-    return c.json({
-      success: true,
-      data: { geofence: newGeofence },
-    }, 201);
-
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Create geofence error:', error);
-    return c.json({ 
-      error: error instanceof Error ? error.message : 'Failed to create geofence' 
-    }, 400);
+    if (error instanceof ValidationError) {
+      return ResponseHandler.badRequest(c, error.message);
+    }
+    if (error instanceof ServiceError) {
+      return ResponseHandler.serverError(c, error.message);
+    }
+    return ResponseHandler.badRequest(c, error instanceof Error ? error.message : 'Failed to create geofence');
   }
 });
 
@@ -118,33 +95,26 @@ geofences.put('/:id', async (c) => {
     const body = await c.req.json();
     const data = validateRequest(createGeofenceSchema, body);
 
-    // Check if geofence exists and belongs to user's business
-    const geofence = db.prepare('SELECT * FROM geofences WHERE id = ? AND business_id = ?')
-      .get(geofenceId, user.businessId);
-
-    if (!geofence) {
-      return c.json({ error: 'Geofence not found' }, 404);
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
     }
 
-    // Update geofence
-    db.prepare(`
-      UPDATE geofences 
-      SET name = ?, type = ?, center_latitude = ?, center_longitude = ?, radius = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(data.name, data.type, data.centerLatitude, data.centerLongitude, data.radius, geofenceId);
+    const geofence = await GeofenceService.updateGeofence(geofenceId, data, user.businessId);
+    return ResponseHandler.success(c, { geofence });
 
-    const updatedGeofence = db.prepare('SELECT * FROM geofences WHERE id = ?').get(geofenceId);
-
-    return c.json({
-      success: true,
-      data: { geofence: updatedGeofence },
-    });
-
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Update geofence error:', error);
-    return c.json({ 
-      error: error instanceof Error ? error.message : 'Failed to update geofence' 
-    }, 400);
+    if (error instanceof NotFoundError) {
+      return ResponseHandler.notFound(c, 'Geofence');
+    }
+    if (error instanceof ValidationError) {
+      return ResponseHandler.badRequest(c, error.message);
+    }
+    if (error instanceof ServiceError) {
+      return ResponseHandler.serverError(c, error.message);
+    }
+    return ResponseHandler.badRequest(c, error instanceof Error ? error.message : 'Failed to update geofence');
   }
 });
 
@@ -154,25 +124,23 @@ geofences.delete('/:id', async (c) => {
     const user = c.get('user');
     const geofenceId = c.req.param('id');
 
-    // Check if geofence exists and belongs to user's business
-    const geofence = db.prepare('SELECT * FROM geofences WHERE id = ? AND business_id = ?')
-      .get(geofenceId, user.businessId);
-
-    if (!geofence) {
-      return c.json({ error: 'Geofence not found' }, 404);
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
     }
 
-    // Delete geofence (events will be kept for historical purposes)
-    db.prepare('DELETE FROM geofences WHERE id = ?').run(geofenceId);
+    await GeofenceService.deleteGeofence(geofenceId, user.businessId);
+    return ResponseHandler.success(c, null, 'Geofence deleted successfully');
 
-    return c.json({
-      success: true,
-      message: 'Geofence deleted successfully',
-    });
-
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Delete geofence error:', error);
-    return c.json({ error: 'Failed to delete geofence' }, 500);
+    if (error instanceof NotFoundError) {
+      return ResponseHandler.notFound(c, 'Geofence');
+    }
+    if (error instanceof ServiceError) {
+      return ResponseHandler.serverError(c, error.message);
+    }
+    return ResponseHandler.serverError(c, 'Failed to delete geofence');
   }
 });
 
@@ -182,29 +150,23 @@ geofences.patch('/:id/toggle', async (c) => {
     const user = c.get('user');
     const geofenceId = c.req.param('id');
 
-    // Check if geofence exists and belongs to user's business
-    const geofence = db.prepare('SELECT * FROM geofences WHERE id = ? AND business_id = ?')
-      .get(geofenceId, user.businessId);
-
-    if (!geofence) {
-      return c.json({ error: 'Geofence not found' }, 404);
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
     }
 
-    // Toggle active status
-    const newStatus = geofence.is_active ? 0 : 1;
-    db.prepare('UPDATE geofences SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-      .run(newStatus, geofenceId);
+    const geofence = await GeofenceService.toggleGeofenceStatus(geofenceId, user.businessId);
+    return ResponseHandler.success(c, { geofence });
 
-    const updatedGeofence = db.prepare('SELECT * FROM geofences WHERE id = ?').get(geofenceId);
-
-    return c.json({
-      success: true,
-      data: { geofence: updatedGeofence },
-    });
-
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Toggle geofence error:', error);
-    return c.json({ error: 'Failed to toggle geofence status' }, 500);
+    if (error instanceof NotFoundError) {
+      return ResponseHandler.notFound(c, 'Geofence');
+    }
+    if (error instanceof ServiceError) {
+      return ResponseHandler.serverError(c, error.message);
+    }
+    return ResponseHandler.serverError(c, 'Failed to toggle geofence status');
   }
 });
 
@@ -215,84 +177,33 @@ geofences.post('/check', async (c) => {
     const { latitude, longitude, driverId, orderId } = await c.req.json();
 
     if (!latitude || !longitude || !driverId) {
-      return c.json({ error: 'Latitude, longitude, and driverId are required' }, 400);
+      return ResponseHandler.badRequest(c, 'Latitude, longitude, and driverId are required');
     }
 
-    // Get all active geofences for the business
-    const activeGeofences = db.prepare(`
-      SELECT * FROM geofences 
-      WHERE business_id = ? AND is_active = 1
-    `).all(user.businessId);
-
-    const triggeredGeofences = [];
-
-    for (const geofence of activeGeofences) {
-      const distance = calculateDistance(
-        latitude, longitude,
-        geofence.center_latitude, geofence.center_longitude
-      );
-
-      if (distance <= geofence.radius) {
-        // Check if this is a new entry (not already inside)
-        const lastEvent = db.prepare(`
-          SELECT * FROM geofence_events 
-          WHERE geofence_id = ? AND driver_id = ? 
-          ORDER BY timestamp DESC 
-          LIMIT 1
-        `).get(geofence.id, driverId);
-
-        const isNewEntry = !lastEvent || lastEvent.event_type === 'exit';
-
-        if (isNewEntry) {
-          // Record geofence entry event
-          const eventId = generateId();
-          db.prepare(`
-            INSERT INTO geofence_events (
-              id, geofence_id, driver_id, order_id, event_type, latitude, longitude
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-          `).run(eventId, geofence.id, driverId, orderId || null, 'enter', latitude, longitude);
-
-          triggeredGeofences.push({
-            ...geofence,
-            eventType: 'enter',
-            distance,
-          });
-        }
-      } else {
-        // Check if driver was previously inside and now exited
-        const lastEvent = db.prepare(`
-          SELECT * FROM geofence_events 
-          WHERE geofence_id = ? AND driver_id = ? 
-          ORDER BY timestamp DESC 
-          LIMIT 1
-        `).get(geofence.id, driverId);
-
-        if (lastEvent && lastEvent.event_type === 'enter') {
-          // Record geofence exit event
-          const eventId = generateId();
-          db.prepare(`
-            INSERT INTO geofence_events (
-              id, geofence_id, driver_id, order_id, event_type, latitude, longitude
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-          `).run(eventId, geofence.id, driverId, orderId || null, 'exit', latitude, longitude);
-
-          triggeredGeofences.push({
-            ...geofence,
-            eventType: 'exit',
-            distance,
-          });
-        }
-      }
+    // Validate businessId exists
+    if (!user.businessId) {
+      return ResponseHandler.forbidden(c, 'Business access required');
     }
 
-    return c.json({
-      success: true,
-      data: { triggeredGeofences },
-    });
+    const triggeredGeofences = await GeofenceService.checkGeofenceEntry(
+      user.businessId,
+      latitude,
+      longitude,
+      driverId,
+      orderId
+    );
 
-  } catch (error) {
+    return ResponseHandler.success(c, { triggeredGeofences });
+
+  } catch (error: unknown) {
     console.error('Check geofences error:', error);
-    return c.json({ error: 'Failed to check geofences' }, 500);
+    if (error instanceof ValidationError) {
+      return ResponseHandler.badRequest(c, error.message);
+    }
+    if (error instanceof ServiceError) {
+      return ResponseHandler.serverError(c, error.message);
+    }
+    return ResponseHandler.serverError(c, 'Failed to check geofences');
   }
 });
 

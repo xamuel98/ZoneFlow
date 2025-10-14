@@ -81,8 +81,8 @@ const Map = ({
     // Add order markers
     orders.forEach((order) => {
       // Pickup marker
-      if (order.pickup_latitude && order.pickup_longitude) {
-        L.marker([order.pickup_latitude, order.pickup_longitude], {
+      if (order.pickup_lat && order.pickup_lng) {
+        L.marker([order.pickup_lat, order.pickup_lng], {
           icon: mapIcons.pickup
         })
           .bindPopup(`
@@ -97,8 +97,8 @@ const Map = ({
       }
 
       // Delivery marker
-      if (order.delivery_latitude && order.delivery_longitude) {
-        L.marker([order.delivery_latitude, order.delivery_longitude], {
+      if (order.delivery_lat && order.delivery_lng) {
+        L.marker([order.delivery_lat, order.delivery_lng], {
           icon: mapIcons.delivery
         })
           .bindPopup(`
@@ -136,47 +136,44 @@ const Map = ({
     // Add geofence circles
     geofences.forEach((geofence) => {
       const color = {
-        pickup: '#f59e0b',
-        delivery: '#10b981',
-        restricted: '#ef4444',
-        custom: '#8b5cf6'
+        circle: '#10b981',
+        polygon: '#8b5cf6'
       }[geofence.type] || '#8b5cf6'
 
-      L.circle([geofence.latitude, geofence.longitude], {
-        radius: geofence.radius,
-        color: color,
-        fillColor: color,
-        fillOpacity: 0.1,
-        weight: 2,
-        opacity: geofence.is_active ? 0.8 : 0.3
-      })
-        .bindPopup(`
-          <div class="p-2">
-            <h3 class="font-semibold">${geofence.name}</h3>
-            <p class="text-sm text-gray-600">Type: ${geofence.type}</p>
-            <p class="text-sm text-gray-600">Radius: ${geofence.radius}m</p>
-            <p class="text-xs text-gray-500">
-              Status: ${geofence.is_active ? 'Active' : 'Inactive'}
-            </p>
-            ${geofence.description ? 
-              `<p class="text-xs text-gray-500">${geofence.description}</p>` : 
-              ''
-            }
-          </div>
-        `)
-        .addTo(map)
+      if (geofence.type === 'circle' && geofence.center_lat && geofence.center_lng) {
+        L.circle([geofence.center_lat, geofence.center_lng], {
+          radius: geofence.radius || 100,
+          color: color,
+          fillColor: color,
+          fillOpacity: 0.1,
+          weight: 2,
+          opacity: geofence.active ? 0.8 : 0.3
+        })
+          .bindPopup(`
+            <div class="p-2">
+              <h3 class="font-semibold">${geofence.name}</h3>
+              <p class="text-sm text-gray-600">Type: ${geofence.type}</p>
+              <p class="text-sm text-gray-600">Radius: ${geofence.radius || 100}m</p>
+              <p class="text-xs text-gray-500">
+                Status: ${geofence.active ? 'Active' : 'Inactive'}
+              </p>
+            </div>
+          `)
+          .addTo(map)
+      }
     })
 
     // Auto-fit bounds if there are markers
     const allPoints = [
       ...orders.flatMap(order => [
-        order.pickup_latitude && order.pickup_longitude ? 
-          { latitude: order.pickup_latitude, longitude: order.pickup_longitude } : null,
-        order.delivery_latitude && order.delivery_longitude ? 
-          { latitude: order.delivery_latitude, longitude: order.delivery_longitude } : null
-      ]).filter(Boolean),
+        order.pickup_lat && order.pickup_lng ?
+        { latitude: order.pickup_lat, longitude: order.pickup_lng } : null,
+        order.delivery_lat && order.delivery_lng ?
+        { latitude: order.delivery_lat, longitude: order.delivery_lng } : null
+      ]).filter((point): point is { latitude: number; longitude: number } => point !== null),
       ...drivers.map(driver => ({ latitude: driver.latitude, longitude: driver.longitude })),
-      ...geofences.map(geofence => ({ latitude: geofence.latitude, longitude: geofence.longitude }))
+      ...geofences.filter(geofence => geofence.center_lat && geofence.center_lng)
+        .map(geofence => ({ latitude: geofence.center_lat!, longitude: geofence.center_lng! }))
     ]
 
     if (allPoints.length > 0) {

@@ -14,19 +14,20 @@
     "db:seed": "tsx src/database/seed.ts"
   },
   "dependencies": {
-    "@zoneflow/shared": "workspace:*",
-    "hono": "^4.0.0",
     "@hono/node-server": "^1.8.0",
-    "better-sqlite3": "^9.2.2",
+    "@zoneflow/shared": "workspace:*",
     "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^9.2.2",
+    "dotenv": "^17.2.3",
+    "hono": "^4.0.0",
     "jsonwebtoken": "^9.0.2",
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.8",
     "@types/bcryptjs": "^2.4.6",
-    "@types/jsonwebtoken": "^9.0.5",
+    "@types/better-sqlite3": "^7.6.8",
     "@types/cors": "^2.8.17",
+    "@types/jsonwebtoken": "^9.0.5",
     "@types/node": "^20.10.6",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",

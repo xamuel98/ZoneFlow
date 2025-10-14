@@ -1,11 +1,18 @@
-import type { Order, OrderStatus, OrderPriority } from '@zoneflow/shared'
+import type { Order } from '@zoneflow/shared'
 import { apiService } from './api'
 
+// Define types that are used in the service
+type OrderStatus = Order['status']
+type OrderPriority = Order['priority']
+
 interface OrdersResponse {
-  orders: Order[]
-  total: number
-  page: number
-  limit: number
+  data: Order[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
 }
 
 interface CreateOrderData {
@@ -13,11 +20,11 @@ interface CreateOrderData {
   customer_phone: string
   customer_email?: string
   pickup_address: string
-  pickup_latitude: number
-  pickup_longitude: number
+  pickup_lat: number
+  pickup_lng: number
   delivery_address: string
-  delivery_latitude: number
-  delivery_longitude: number
+  delivery_lat: number
+  delivery_lng: number
   priority: OrderPriority
   notes?: string
   scheduled_pickup?: string

@@ -4,9 +4,7 @@ import {
   Package, 
   Users, 
   MapPin, 
-  TrendingUp, 
   Clock,
-  CheckCircle,
   AlertCircle,
   Truck
 } from 'lucide-react'
@@ -14,28 +12,34 @@ import { toast } from 'sonner'
 import Map from '../components/Map'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { dashboardService } from '../services/dashboardService'
-import { formatDate, formatDuration, formatPercentage } from '../utils/format'
+import { formatDuration, formatPercentage } from '../utils/format'
 import { useAuthStore } from '../stores/authStore'
 
 interface DashboardStats {
   totalOrders: number
   activeOrders: number
+  completedOrders: number
+  cancelledOrders: number
   totalDrivers: number
-  availableDrivers: number
-  totalGeofences: number
-  ordersByStatus: Record<string, number>
-  ordersByPriority: Record<string, number>
-  recentOrders: any[]
-  deliveryPerformance: {
-    onTimeDeliveries: number
+  activeDrivers: number
+  totalRevenue: number
+  avgDeliveryTime: number
+  orderMetrics: {
+    pending: number
+    in_progress: number
+    completed: number
+    cancelled: number
+  }
+  deliveryMetrics: {
+    onTime: number
+    delayed: number
     totalDeliveries: number
-    averageDeliveryTime: number
   }
   topDrivers: Array<{
     id: string
     name: string
     completedOrders: number
-    averageRating: number
+    avgRating: number
   }>
 }
 
@@ -94,8 +98,8 @@ const Dashboard = () => {
     )
   }
 
-  const onTimePercentage = stats.deliveryPerformance.totalDeliveries > 0 
-    ? stats.deliveryPerformance.onTimeDeliveries / stats.deliveryPerformance.totalDeliveries 
+  const onTimePercentage = stats?.deliveryMetrics?.totalDeliveries > 0 
+    ? stats?.deliveryMetrics?.onTime / stats?.deliveryMetrics?.totalDeliveries 
     : 0
 
   return (
@@ -159,7 +163,7 @@ const Dashboard = () => {
                   Available Drivers
                 </dt>
                 <dd className="text-lg font-medium text-gray-900">
-                  {stats.availableDrivers}/{stats.totalDrivers}
+                  {stats.activeDrivers}/{stats.totalDrivers}
                 </dd>
               </dl>
             </div>
@@ -169,15 +173,15 @@ const Dashboard = () => {
         <div className="card">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <MapPin className="h-8 w-8 text-purple-600" />
+              <Package className="h-8 w-8 text-green-600" />
             </div>
             <div className="ml-5 w-0 flex-1">
               <dl>
                 <dt className="text-sm font-medium text-gray-500 truncate">
-                  Geofences
+                  Total Revenue
                 </dt>
                 <dd className="text-lg font-medium text-gray-900">
-                  {stats.totalGeofences}
+                  ${stats.totalRevenue}
                 </dd>
               </dl>
             </div>
@@ -233,7 +237,7 @@ const Dashboard = () => {
               </div>
               <div className="flex items-center justify-between text-sm text-gray-600">
                 <span>Avg. Delivery Time</span>
-                <span>{formatDuration(stats.deliveryPerformance.averageDeliveryTime)}</span>
+                <span>{formatDuration(stats.avgDeliveryTime)}</span>
               </div>
             </div>
           </div>
@@ -244,7 +248,7 @@ const Dashboard = () => {
               <h3 className="text-lg font-medium text-gray-900">Order Status</h3>
             </div>
             <div className="space-y-3">
-              {Object.entries(stats.ordersByStatus).map(([status, count]) => (
+              {Object.entries(stats.orderMetrics).map(([status, count]) => (
                 <div key={status} className="flex items-center justify-between">
                   <div className="flex items-center">
                     <span className={`status-badge status-${status.replace('_', '-')}`}>
@@ -268,7 +272,7 @@ const Dashboard = () => {
                 className="flex items-center p-3 text-sm text-gray-700 rounded-lg hover:bg-gray-50"
               >
                 <AlertCircle className="h-5 w-5 text-warning-600 mr-3" />
-                View Pending Orders ({stats.ordersByStatus.pending || 0})
+                View Pending Orders ({stats.orderMetrics.pending || 0})
               </Link>
               <Link
                 to="/drivers"
@@ -289,59 +293,51 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Recent Orders */}
+      {/* Top Drivers */}
       <div className="card">
         <div className="card-header">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium text-gray-900">Recent Orders</h3>
+            <h3 className="text-lg font-medium text-gray-900">Top Drivers</h3>
             <Link
-              to="/orders"
+              to="/drivers"
               className="text-sm text-primary-600 hover:text-primary-500"
             >
               View all
             </Link>
           </div>
         </div>
-        {stats.recentOrders.length > 0 ? (
+        {stats.topDrivers.length > 0 ? (
           <div className="overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Order
+                    Driver
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Customer
+                    Completed Orders
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Created
+                    Avg Rating
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {stats.recentOrders.slice(0, 5).map((order) => (
-                  <tr key={order.id} className="hover:bg-gray-50">
+                {stats.topDrivers.slice(0, 5).map((driver) => (
+                  <tr key={driver.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <Link
-                        to={`/orders/${order.id}`}
+                        to={`/drivers/${driver.id}`}
                         className="text-sm font-medium text-primary-600 hover:text-primary-500"
                       >
-                        {order.tracking_code}
+                        {driver.name}
                       </Link>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {order.customer_name}
+                      {driver.completedOrders}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`status-badge status-${order.status.replace('_', '-')}`}>
-                        {order.status.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(order.created_at)}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {driver.avgRating.toFixed(1)}
                     </td>
                   </tr>
                 ))}
@@ -350,14 +346,14 @@ const Dashboard = () => {
           </div>
         ) : (
           <div className="text-center py-8">
-            <Package className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No orders yet</h3>
+            <Users className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No drivers yet</h3>
             <p className="mt-1 text-sm text-gray-500">
-              Get started by creating your first order.
+              Get started by adding your first driver.
             </p>
             <div className="mt-6">
-              <Link to="/orders" className="btn-primary">
-                Create Order
+              <Link to="/drivers" className="btn-primary">
+                Add Driver
               </Link>
             </div>
           </div>
