@@ -1,0 +1,54 @@
+{
+  "name": "zoneflow",
+  "version": "1.0.0",
+  "description": "Unified logistics platform combining real-time order tracking with intelligent geofencing",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"pnpm run dev:api\" \"pnpm run dev:web\"",
+    "dev:api": "pnpm --filter @zoneflow/api run dev",
+    "dev:web": "pnpm --filter @zoneflow/web run dev",
+    "build": "pnpm run build:shared && pnpm run build:api && pnpm run build:web",
+    "build:shared": "pnpm --filter @zoneflow/shared run build",
+    "build:api": "pnpm --filter @zoneflow/api run build",
+    "build:web": "pnpm --filter @zoneflow/web run build",
+    "test": "pnpm --filter \"./packages/*\" run test",
+    "lint": "pnpm --filter \"./packages/*\" run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "db:setup": "pnpm --filter @zoneflow/api run db:setup",
+    "db:migrate": "pnpm --filter @zoneflow/api run db:migrate",
+    "db:seed": "pnpm --filter @zoneflow/api run db:seed"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.3.3"
+  },
+  "keywords": [
+    "logistics",
+    "tracking",
+    "geofencing",
+    "delivery",
+    "hono",
+    "react",
+    "typescript"
+  ],
+  "author": "ZoneFlow Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/zoneflow.git"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
