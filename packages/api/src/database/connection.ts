@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+import Database, { type Database as DatabaseType } from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -16,7 +16,7 @@ if (!fs.existsSync(dataDir)) {
 }
 
 // Create database connection
-const db = new Database(dbPath);
+const db: DatabaseType = new Database(dbPath);
 
 // Enable WAL mode for better performance
 db.pragma('journal_mode = WAL');

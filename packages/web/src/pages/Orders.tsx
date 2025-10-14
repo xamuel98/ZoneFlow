@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Package, Plus, Search, Filter } from 'lucide-react'
+import { Package, Plus, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { ordersService } from '../services/ordersService'
 import { formatDate } from '../utils/format'
-import type { Order, OrderStatus, OrderPriority } from '@zoneflow/shared'
+import type { Order } from '@zoneflow/shared'
+
+// Define types that are used in the component
+type OrderStatus = Order['status']
+type OrderPriority = Order['priority']
 
 const Orders = () => {
   const [orders, setOrders] = useState<Order[]>([])

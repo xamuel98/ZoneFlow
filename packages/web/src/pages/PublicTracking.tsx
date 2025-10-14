@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { Package, MapPin, Clock, Truck } from 'lucide-react'
+import { Package, Truck } from 'lucide-react'
 import { toast } from 'sonner'
 import Map from '../components/Map'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -55,7 +55,7 @@ const PublicTracking = () => {
     )
   }
 
-  const { order, locationHistory } = trackingData
+  const { order } = trackingData
 
   return (
     <div className="min-h-screen bg-gray-50">

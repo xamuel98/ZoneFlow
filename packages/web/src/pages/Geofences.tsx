@@ -104,16 +104,18 @@ const Geofences = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <p className="text-sm font-medium text-gray-900">{geofence.name}</p>
-                        {geofence.description && (
-                          <p className="text-xs text-gray-500">{geofence.description}</p>
-                        )}
+                        <p className="text-xs text-gray-500">
+                          {geofence.type === 'circle' ? 
+                            `Circle - Radius: ${geofence.radius}m` : 
+                            'Polygon area'
+                          }
+                        </p>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`status-badge ${
-                        geofence.type === 'pickup' ? 'bg-yellow-100 text-yellow-800' :
-                        geofence.type === 'delivery' ? 'bg-green-100 text-green-800' :
-                        geofence.type === 'restricted' ? 'bg-red-100 text-red-800' :
+                        geofence.type === 'circle' ? 'bg-blue-100 text-blue-800' :
+                        geofence.type === 'polygon' ? 'bg-green-100 text-green-800' :
                         'bg-purple-100 text-purple-800'
                       }`}>
                         {geofence.type}
@@ -126,12 +128,12 @@ const Geofences = () => {
                       <button
                         onClick={() => handleToggleGeofence(geofence.id)}
                         className={`status-badge ${
-                          geofence.is_active 
+                          geofence.active 
                             ? 'bg-green-100 text-green-800' 
                             : 'bg-gray-100 text-gray-800'
                         }`}
                       >
-                        {geofence.is_active ? 'Active' : 'Inactive'}
+                        {geofence.active ? 'Active' : 'Inactive'}
                       </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

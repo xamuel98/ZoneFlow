@@ -1,6 +1,7 @@
 import { Context, Next } from 'hono';
 import jwt from 'jsonwebtoken';
 import db from '../database/connection.js';
+import { AppContext } from '../types/context.js';
 
 interface JWTPayload {
   userId: string;
@@ -9,7 +10,7 @@ interface JWTPayload {
   businessId?: string;
 }
 
-export const authMiddleware = async (c: Context, next: Next) => {
+export const authMiddleware = async (c: AppContext, next: Next) => {
   try {
     const authHeader = c.req.header('Authorization');
     
@@ -27,7 +28,13 @@ export const authMiddleware = async (c: Context, next: Next) => {
       SELECT id, email, role, business_id, is_active 
       FROM users 
       WHERE id = ? AND is_active = 1
-    `).get(decoded.userId);
+    `).get(decoded.userId) as {
+      id: string;
+      email: string;
+      role: string;
+      business_id: string;
+      is_active: number;
+    } | undefined;
 
     if (!user) {
       return c.json({ error: 'Invalid or expired token' }, 401);
@@ -49,7 +56,7 @@ export const authMiddleware = async (c: Context, next: Next) => {
 };
 
 export const requireRole = (roles: string[]) => {
-  return async (c: Context, next: Next) => {
+  return async (c: AppContext, next: Next) => {
     const user = c.get('user');
     
     if (!user || !roles.includes(user.role)) {
@@ -60,7 +67,7 @@ export const requireRole = (roles: string[]) => {
   };
 };
 
-export const requireBusinessAccess = async (c: Context, next: Next) => {
+export const requireBusinessAccess = async (c: AppContext, next: Next) => {
   const user = c.get('user');
   const businessId = c.req.param('businessId') || c.req.query('businessId');
 

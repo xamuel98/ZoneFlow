@@ -1,5 +1,8 @@
-import type { Geofence, GeofenceType } from '@zoneflow/shared'
+import type { Geofence } from '@zoneflow/shared'
 import { apiService } from './api'
+
+// Define types that are used in the service
+type GeofenceType = Geofence['type']
 
 interface CreateGeofenceData {
   name: string

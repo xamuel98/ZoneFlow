@@ -20,7 +20,7 @@ import { errorHandler } from './middleware/error.js';
 // Load environment variables
 dotenv.config();
 
-const app = new Hono();
+const app = new Hono<{ Variables: { user: import('./types/context.js').AuthUser } }>();
 
 // Global middleware
 app.use('*', logger());

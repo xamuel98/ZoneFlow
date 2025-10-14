@@ -1,142 +1,62 @@
 import { Hono } from 'hono';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { generateId } from '@zoneflow/shared';
-import db from '../database/connection.js';
-import { validateRequest, registerSchema, loginSchema, createBusinessSchema } from '../utils/validation.js';
+import { validateRequest, registerSchema, loginSchema } from '../utils/validation.js';
+import { ResponseHandler } from '../utils/response.js';
+import { AuthService } from '../services/AuthService.js';
+import { ServiceError, NotFoundError, ValidationError, UnauthorizedError, ConflictError } from '../types/services.js';
 
 const auth = new Hono();
 
-// Register endpoint
+// Register new user
 auth.post('/register', async (c) => {
   try {
     const body = await c.req.json();
     const data = validateRequest(registerSchema, body);
 
-    // Check if user already exists
-    const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(data.email);
-    if (existingUser) {
-      return c.json({ error: 'User already exists with this email' }, 409);
-    }
+    const result = await AuthService.register(data);
 
-    // Hash password
-    const passwordHash = await bcrypt.hash(data.password, 12);
-    const userId = generateId();
+    return ResponseHandler.success(c, result, 'Registration successful');
 
-    // Start transaction
-    const transaction = db.transaction(() => {
-      // Create user
-      db.prepare(`
-        INSERT INTO users (id, email, password_hash, name, role, phone)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(userId, data.email, passwordHash, data.name, data.role, data.phone || null);
-
-      // If business owner, create business
-      let businessId = null;
-      if (data.role === 'business_owner') {
-        businessId = generateId();
-        db.prepare(`
-          INSERT INTO businesses (id, name, owner_id, email, phone)
-          VALUES (?, ?, ?, ?, ?)
-        `).run(businessId, `${data.name}'s Business`, userId, data.email, data.phone || null);
-
-        // Update user with business_id
-        db.prepare('UPDATE users SET business_id = ? WHERE id = ?').run(businessId, userId);
-      }
-
-      return { userId, businessId };
-    });
-
-    const result = transaction();
-
-    // Generate JWT token
-    const token = jwt.sign(
-      { 
-        userId: result.userId, 
-        email: data.email, 
-        role: data.role,
-        businessId: result.businessId 
-      },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '7d' }
-    );
-
-    return c.json({
-      success: true,
-      data: {
-        user: {
-          id: result.userId,
-          email: data.email,
-          name: data.name,
-          role: data.role,
-          businessId: result.businessId,
-        },
-        token,
-      },
-    }, 201);
-
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Registration error:', error);
-    return c.json({ 
-      error: error instanceof Error ? error.message : 'Registration failed' 
-    }, 400);
+    if (error instanceof ConflictError) {
+      return ResponseHandler.badRequest(c, error.message);
+    }
+    if (error instanceof ValidationError) {
+      return ResponseHandler.badRequest(c, error.message);
+    }
+    if (error instanceof ServiceError) {
+      return ResponseHandler.serverError(c, error.message);
+    }
+    return ResponseHandler.serverError(c, 
+      error instanceof Error ? error.message : 'Registration failed'
+    );
   }
 });
 
-// Login endpoint
+// Login user
 auth.post('/login', async (c) => {
   try {
     const body = await c.req.json();
     const data = validateRequest(loginSchema, body);
 
-    // Find user
-    const user = db.prepare(`
-      SELECT id, email, password_hash, name, role, business_id, is_active
-      FROM users 
-      WHERE email = ?
-    `).get(data.email);
+    const result = await AuthService.login(data);
 
-    if (!user || !user.is_active) {
-      return c.json({ error: 'Invalid email or password' }, 401);
-    }
+    return ResponseHandler.success(c, result, 'Login successful');
 
-    // Verify password
-    const isValidPassword = await bcrypt.compare(data.password, user.password_hash);
-    if (!isValidPassword) {
-      return c.json({ error: 'Invalid email or password' }, 401);
-    }
-
-    // Generate JWT token
-    const token = jwt.sign(
-      { 
-        userId: user.id, 
-        email: user.email, 
-        role: user.role,
-        businessId: user.business_id 
-      },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '7d' }
-    );
-
-    return c.json({
-      success: true,
-      data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          businessId: user.business_id,
-        },
-        token,
-      },
-    });
-
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Login error:', error);
-    return c.json({ 
-      error: error instanceof Error ? error.message : 'Login failed' 
-    }, 400);
+    if (error instanceof UnauthorizedError) {
+      return ResponseHandler.unauthorized(c, error.message);
+    }
+    if (error instanceof ValidationError) {
+      return ResponseHandler.badRequest(c, error.message);
+    }
+    if (error instanceof ServiceError) {
+      return ResponseHandler.serverError(c, error.message);
+    }
+    return ResponseHandler.serverError(c, 
+      error instanceof Error ? error.message : 'Login failed'
+    );
   }
 });
 
@@ -145,40 +65,29 @@ auth.get('/me', async (c) => {
   try {
     const authHeader = c.req.header('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ error: 'Authorization token required' }, 401);
+      return ResponseHandler.unauthorized(c, 'Authorization token required');
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
+    const user = await AuthService.verifyToken(token);
+    const profile = await AuthService.getUserProfile(user.id);
 
-    const user = db.prepare(`
-      SELECT id, email, name, role, business_id, phone, created_at
-      FROM users 
-      WHERE id = ? AND is_active = 1
-    `).get(decoded.userId);
+    return ResponseHandler.success(c, {
+      user: profile,
+    }, 'User profile retrieved successfully');
 
-    if (!user) {
-      return c.json({ error: 'User not found' }, 404);
-    }
-
-    return c.json({
-      success: true,
-      data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          businessId: user.business_id,
-          phone: user.phone,
-          createdAt: user.created_at,
-        },
-      },
-    });
-
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Get profile error:', error);
-    return c.json({ error: 'Failed to get user profile' }, 400);
+    if (error instanceof UnauthorizedError) {
+      return ResponseHandler.unauthorized(c, error.message);
+    }
+    if (error instanceof NotFoundError) {
+      return ResponseHandler.notFound(c, 'User');
+    }
+    if (error instanceof ServiceError) {
+      return ResponseHandler.serverError(c, error.message);
+    }
+    return ResponseHandler.serverError(c, 'Failed to get user profile');
   }
 });
 
@@ -187,32 +96,23 @@ auth.post('/refresh', async (c) => {
   try {
     const authHeader = c.req.header('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ error: 'Authorization token required' }, 401);
+      return ResponseHandler.unauthorized(c, 'Authorization token required');
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
+    const result = await AuthService.refreshToken(token);
 
-    // Generate new token
-    const newToken = jwt.sign(
-      { 
-        userId: decoded.userId, 
-        email: decoded.email, 
-        role: decoded.role,
-        businessId: decoded.businessId 
-      },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '7d' }
-    );
+    return ResponseHandler.success(c, result, 'Token refreshed successfully');
 
-    return c.json({
-      success: true,
-      data: { token: newToken },
-    });
-
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Token refresh error:', error);
-    return c.json({ error: 'Failed to refresh token' }, 401);
+    if (error instanceof UnauthorizedError) {
+      return ResponseHandler.unauthorized(c, error.message);
+    }
+    if (error instanceof ServiceError) {
+      return ResponseHandler.serverError(c, error.message);
+    }
+    return ResponseHandler.unauthorized(c, 'Failed to refresh token');
   }
 });
 

@@ -4,9 +4,7 @@ import {
   Package, 
   Users, 
   MapPin, 
-  TrendingUp, 
   Clock,
-  CheckCircle,
   AlertCircle,
   Truck
 } from 'lucide-react'
