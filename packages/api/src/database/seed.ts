@@ -3,6 +3,7 @@
 import bcrypt from 'bcryptjs';
 import { generateId, generateTrackingCode } from '@zoneflow/shared';
 import db from './connection.js';
+import { AuthService } from '../services/auth.service.js';
 
 const seedData = async () => {
   console.log('🌱 Seeding database with sample data...');
@@ -10,7 +11,8 @@ const seedData = async () => {
   try {
     // Create admin user
     const adminId = generateId();
-    const adminPasswordHash = await bcrypt.hash('admin123', 12);
+    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || '10');
+    const adminPasswordHash = await bcrypt.hash('admin123', saltRounds);
     
     db.prepare(`
       INSERT INTO users (id, email, password_hash, name, role, is_active)
@@ -19,7 +21,7 @@ const seedData = async () => {
 
     // Create business owner
     const businessOwnerId = generateId();
-    const businessOwnerPasswordHash = await bcrypt.hash('owner123', 12);
+    const businessOwnerPasswordHash = await bcrypt.hash('owner123', saltRounds);
     
     db.prepare(`
       INSERT INTO users (id, email, password_hash, name, role, phone, is_active)
@@ -39,12 +41,13 @@ const seedData = async () => {
     // Create drivers
     const driver1Id = generateId();
     const driver1UserId = generateId();
-    const driver1PasswordHash = await bcrypt.hash('driver123', 12);
+    // Seed driver 1 as invited (no known password); generate placeholder hash
+    const driver1PasswordHash = await bcrypt.hash(generateId(), saltRounds);
     
     db.prepare(`
-      INSERT INTO users (id, email, password_hash, name, role, business_id, phone, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(driver1UserId, 'driver1@example.com', driver1PasswordHash, 'Mike Johnson', 'driver', businessId, '+1234567891', 1);
+      INSERT INTO users (id, email, password_hash, name, role, business_id, phone, is_active, is_invited)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(driver1UserId, 'driver1@example.com', driver1PasswordHash, 'Mike Johnson', 'driver', businessId, '+1234567891', 1, 1);
 
     db.prepare(`
       INSERT INTO drivers (id, user_id, business_id, vehicle_type, license_plate, is_available, current_latitude, current_longitude)
@@ -53,12 +56,12 @@ const seedData = async () => {
 
     const driver2Id = generateId();
     const driver2UserId = generateId();
-    const driver2PasswordHash = await bcrypt.hash('driver123', 12);
+    const driver2PasswordHash = await bcrypt.hash(generateId(), saltRounds);
     
     db.prepare(`
-      INSERT INTO users (id, email, password_hash, name, role, business_id, phone, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(driver2UserId, 'driver2@example.com', driver2PasswordHash, 'Sarah Wilson', 'driver', businessId, '+1234567892', 1);
+      INSERT INTO users (id, email, password_hash, name, role, business_id, phone, is_active, is_invited)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(driver2UserId, 'driver2@example.com', driver2PasswordHash, 'Sarah Wilson', 'driver', businessId, '+1234567892', 1, 1);
 
     db.prepare(`
       INSERT INTO drivers (id, user_id, business_id, vehicle_type, license_plate, is_available, current_latitude, current_longitude)
@@ -171,8 +174,15 @@ const seedData = async () => {
     console.log('\n📋 Sample accounts created:');
     console.log('Admin: admin@zoneflow.com / admin123');
     console.log('Business Owner: owner@example.com / owner123');
-    console.log('Driver 1: driver1@example.com / driver123');
-    console.log('Driver 2: driver2@example.com / driver123');
+    try {
+      const base = process.env.INVITE_URL_BASE || 'https://app.zoneflow.app/accept-invite';
+      const invite1 = AuthService.createInviteToken({ userId: driver1UserId, email: 'driver1@example.com', businessId });
+      const invite2 = AuthService.createInviteToken({ userId: driver2UserId, email: 'driver2@example.com', businessId });
+      console.log(`Driver 1 invite: ${base}?token=${encodeURIComponent(invite1)}`);
+      console.log(`Driver 2 invite: ${base}?token=${encodeURIComponent(invite2)}`);
+    } catch {
+      console.log('Set JWT_SECRET to generate invite URLs for drivers.');
+    }
     console.log('\n📦 Sample data:');
     console.log('- 3 orders (1 in transit, 1 pending, 1 delivered)');
     console.log('- 2 drivers with locations');

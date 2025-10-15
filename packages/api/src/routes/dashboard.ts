@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { authMiddleware } from '../middleware/auth.js';
 import { ResponseHandler } from '../utils/response.js';
-import { DashboardService } from '../services/DashboardService.js';
+import { DashboardService } from '../services/dashboard.service';
 import { ServiceError, ForbiddenError } from '../types/services.js';
 
 const dashboard = new Hono<{ Variables: { user: import('../types/context.js').AuthUser } }>();
@@ -14,6 +14,8 @@ dashboard.get('/stats', async (c) => {
   try {
     const user = c.get('user');
     const period = c.req.query('period') || '30';
+    const allowed = ['7','14','30','90'];
+    const periodClamped = allowed.includes(period) ? period : '30';
 
     // Validate permissions
     DashboardService.validateDashboardAccess(user.role);
@@ -23,7 +25,7 @@ dashboard.get('/stats', async (c) => {
       return ResponseHandler.forbidden(c, 'Business access required');
     }
 
-    const stats = await DashboardService.getStats(user.businessId, period);
+    const stats = await DashboardService.getStats(user.businessId, periodClamped);
 
     return ResponseHandler.success(c, stats);
 
@@ -46,7 +48,8 @@ dashboard.get('/stats', async (c) => {
 dashboard.get('/activity', async (c) => {
   try {
     const user = c.get('user');
-    const limit = parseInt(c.req.query('limit') || '20');
+    const limitRaw = parseInt(c.req.query('limit') || '20');
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 100) : 20;
 
     // Validate permissions
     DashboardService.validateDashboardAccess(user.role);

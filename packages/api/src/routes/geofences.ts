@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { authMiddleware } from '../middleware/auth.js';
-import { validateRequest, createGeofenceSchema } from '../utils/validation.js';
+import { validateRequest, createGeofenceSchema, updateGeofenceSchema } from '../utils/validation.js';
 import { ResponseHandler } from '../utils/response.js';
-import { GeofenceService } from '../services/GeofenceService.js';
+import { GeofenceService } from '../services/geofence.service';
 import { ServiceError, NotFoundError, ValidationError } from '../types/services.js';
 
 const geofences = new Hono<{ Variables: { user: import('../types/context.js').AuthUser } }>();
@@ -63,8 +63,8 @@ geofences.get('/:id', async (c) => {
 geofences.post('/', async (c) => {
   try {
     const user = c.get('user');
-    const body = await c.req.json();
-    const data = validateRequest(createGeofenceSchema, body);
+  const body = await c.req.json();
+  const data = validateRequest(updateGeofenceSchema, body);
 
     // Validate businessId exists
     if (!user.businessId) {

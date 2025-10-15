@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
-import { authMiddleware } from '../middleware/auth.js';
-import { validateRequest, createOrderSchema, updateOrderStatusSchema } from '../utils/validation.js';
+import { authMiddleware, requireRole } from '../middleware/auth.js';
+import { validateRequest, createOrderSchema, updateOrderStatusSchema, orderListFilterSchema } from '../utils/validation.js';
 import { ResponseHandler } from '../utils/response.js';
-import { OrderService } from '../services/OrderService.js';
+import { OrderService } from '../services/order.service';
 import { ServiceError, NotFoundError, ValidationError } from '../types/services.js';
 import type { OrderFilters, CreateOrderData, UpdateOrderStatusData } from '../types/services.js';
 
@@ -15,14 +15,16 @@ orders.use('*', authMiddleware);
 orders.get('/', async (c) => {
   try {
     const user = c.get('user');
-    const page = parseInt(c.req.query('page') || '1');
-    const limit = parseInt(c.req.query('limit') || '20');
+    const pageRaw = parseInt(c.req.query('page') || '1');
+    const limitRaw = parseInt(c.req.query('limit') || '20');
+    const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 100) : 20;
     
-    const filters: OrderFilters = {
-      status: c.req.query('status'),
-      priority: c.req.query('priority'),
-      driverId: c.req.query('driverId'),
-    };
+    const filters: OrderFilters = validateRequest(orderListFilterSchema, {
+      status: c.req.query('status') || undefined,
+      priority: c.req.query('priority') || undefined,
+      driverId: c.req.query('driverId') || undefined,
+    });
 
     const pagination = {
       page,
@@ -81,7 +83,7 @@ orders.get('/:id', async (c) => {
 });
 
 // Create new order
-orders.post('/', async (c) => {
+orders.post('/', requireRole(['admin','business_owner']), async (c) => {
   try {
     const user = c.get('user');
     const body = await c.req.json();
@@ -112,7 +114,7 @@ orders.post('/', async (c) => {
 });
 
 // Update order status
-orders.patch('/:id/status', async (c) => {
+orders.patch('/:id/status', requireRole(['admin','business_owner']), async (c) => {
   try {
     const user = c.get('user');
     const orderId = c.req.param('id');
@@ -148,7 +150,7 @@ orders.patch('/:id/status', async (c) => {
 });
 
 // Assign driver to order
-orders.patch('/:id/assign', async (c) => {
+orders.patch('/:id/assign', requireRole(['admin','business_owner']), async (c) => {
   try {
     const user = c.get('user');
     const orderId = c.req.param('id');
@@ -211,7 +213,7 @@ orders.get('/track/:trackingCode', async (c) => {
 });
 
 // Cancel order
-orders.patch('/:id/cancel', async (c) => {
+orders.patch('/:id/cancel', requireRole(['admin','business_owner']), async (c) => {
   try {
     const user = c.get('user');
     const orderId = c.req.param('id');

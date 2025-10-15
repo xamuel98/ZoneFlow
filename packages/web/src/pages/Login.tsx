@@ -1,9 +1,14 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Eye, EyeOff, Truck, Mail, Lock } from 'lucide-react'
+import { RiEyeLine, RiEyeOffLine, RiTruckLine, RiMailLine, RiLockLine, RiUserLine, RiBuildingLine } from '@remixicon/react'
 import { toast } from 'sonner'
-import { useAuthStore } from '../stores/authStore'
-import LoadingSpinner from '../components/LoadingSpinner'
+import { useAuthStore } from '../stores/auth.store'
+import LoadingSpinner from '../components/loading-spinner'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 
 const Login = () => {
   const [isLogin, setIsLogin] = useState(true)
@@ -44,165 +49,206 @@ const Login = () => {
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value
     }))
   }
 
+  const handleRoleChange = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      role: value as 'business_owner' | 'driver'
+    }))
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        <div>
+        {/* Logo and Header */}
+        <div className="text-center">
           <div className="flex justify-center">
-            <div className="w-12 h-12 bg-primary-600 rounded-lg flex items-center justify-center">
-              <Truck className="w-8 h-8 text-white" />
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+              <RiTruckLine className="w-10 h-10 text-white" />
             </div>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-            {isLogin ? 'Sign in to your account' : 'Create your account'}
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            {isLogin ? "Don't have an account? " : 'Already have an account? '}
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="font-medium text-primary-600 hover:text-primary-500"
-            >
-              {isLogin ? 'Sign up' : 'Sign in'}
-            </button>
+          <h1 className="mt-6 text-3xl font-bold text-gray-900">ZoneFlow</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Logistics management made simple
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            {!isLogin && (
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                  Full Name
-                </label>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  required={!isLogin}
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="Enter your full name"
-                />
-              </div>
-            )}
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email Address
-              </label>
-              <div className="mt-1 relative">
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="block w-full px-3 py-2 pl-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="Enter your email"
-                />
-                <Mail className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <div className="mt-1 relative">
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className="block w-full px-3 py-2 pl-10 pr-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="Enter your password"
-                />
-                <Lock className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
-              </div>
-            </div>
-
-            {!isLogin && (
-              <>
-                <div>
-                  <label htmlFor="role" className="block text-sm font-medium text-gray-700">
-                    Role
-                  </label>
-                  <select
-                    id="role"
-                    name="role"
-                    value={formData.role}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                  >
-                    <option value="business_owner">Business Owner</option>
-                    <option value="driver">Driver</option>
-                  </select>
-                </div>
-
-                {formData.role === 'business_owner' && (
-                  <div>
-                    <label htmlFor="businessName" className="block text-sm font-medium text-gray-700">
-                      Business Name
-                    </label>
-                    <input
-                      id="businessName"
-                      name="businessName"
+        {/* Authentication Card */}
+        <Card className="shadow-xl border-0">
+          <CardHeader className="space-y-1 pb-6">
+            <CardTitle className="text-2xl font-bold text-center">
+              {isLogin ? 'Welcome back' : 'Create account'}
+            </CardTitle>
+            <CardDescription className="text-center">
+              {isLogin 
+                ? 'Enter your credentials to access your account' 
+                : 'Fill in your information to get started'
+              }
+            </CardDescription>
+          </CardHeader>
+          
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Name field for registration */}
+              {!isLogin && (
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <div className="relative">
+                    <RiUserLine className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                    <Input
+                      id="name"
+                      name="name"
                       type="text"
-                      required={formData.role === 'business_owner'}
-                      value={formData.businessName}
+                      required={!isLogin}
+                      value={formData.name}
                       onChange={handleInputChange}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      placeholder="Enter your business name"
+                      className="pl-10"
+                      placeholder="Enter your full name"
                     />
                   </div>
-                )}
-              </>
-            )}
-          </div>
+                </div>
+              )}
 
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <LoadingSpinner size="sm" className="mr-2" />
-              ) : null}
-              {isLogin ? 'Sign in' : 'Create account'}
-            </button>
-          </div>
+              {/* Email field */}
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <div className="relative">
+                  <RiMailLine className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="pl-10"
+                    placeholder="Enter your email"
+                  />
+                </div>
+              </div>
 
-          {isLogin && (
-            <div className="text-center">
-              <Link
-                to="/track/demo"
-                className="text-sm text-primary-600 hover:text-primary-500"
+              {/* Password field */}
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <RiLockLine className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className="pl-10 pr-10"
+                    placeholder="Enter your password"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  >
+                    {showPassword ? (
+                      <RiEyeOffLine className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <RiEyeLine className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Registration-only fields */}
+              {!isLogin && (
+                <>
+                  {/* Role selection */}
+                  <div className="space-y-2">
+                    <Label htmlFor="role">Role</Label>
+                    <Select value={formData.role} onValueChange={handleRoleChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select your role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="business_owner">Business Owner</SelectItem>
+                        <SelectItem value="driver">Driver</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Business name for business owners */}
+                  {formData.role === 'business_owner' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="businessName">Business Name</Label>
+                      <div className="relative">
+                        <RiBuildingLine className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                        <Input
+                          id="businessName"
+                          name="businessName"
+                          type="text"
+                          required={formData.role === 'business_owner'}
+                          value={formData.businessName}
+                          onChange={handleInputChange}
+                          className="pl-10"
+                          placeholder="Enter your business name"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Submit button */}
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full mt-6"
+                size="lg"
               >
-                Track a package without signing in
-              </Link>
+                {isLoading && <LoadingSpinner size="sm" className="mr-2" />}
+                {isLogin ? 'Sign in' : 'Create account'}
+              </Button>
+            </form>
+
+            {/* Toggle between login/register */}
+            <div className="mt-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                {isLogin ? "Don't have an account? " : 'Already have an account? '}
+                <Button
+                  type="button"
+                  variant="link"
+                  onClick={() => setIsLogin(!isLogin)}
+                  className="p-0 h-auto font-medium"
+                >
+                  {isLogin ? 'Sign up' : 'Sign in'}
+                </Button>
+              </p>
             </div>
-          )}
-        </form>
+
+            {/* Public tracking link */}
+            {isLogin && (
+              <div className="mt-4 text-center">
+                <Link to="/track/demo">
+                  <Button variant="link" className="text-sm">
+                    Track a package without signing in
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Footer */}
+        <div className="text-center">
+          <p className="text-xs text-muted-foreground">
+            By continuing, you agree to our Terms of Service and Privacy Policy
+          </p>
+        </div>
       </div>
     </div>
   )
