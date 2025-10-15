@@ -1,0 +1,4 @@
+name,email,phone,vehicle_type,license_plate
+Alice Cooper,alice.cooper@example.com,4567890123,motorcycle,BIKE001
+Charlie Brown,charlie.brown@example.com,5678901234,truck,TRUCK002
+Diana Prince,diana.prince@example.com,6789012345,sedan,CAR003

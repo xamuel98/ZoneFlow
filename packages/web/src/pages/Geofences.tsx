@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react'
-import { MapPin, Plus } from 'lucide-react'
+import { RiMapPinLine, RiAddLine, RiEditLine, RiDeleteBinLine } from '@remixicon/react'
 import { toast } from 'sonner'
-import LoadingSpinner from '../components/LoadingSpinner'
-import Map from '../components/Map'
-import { geofencesService, type BackendGeofence } from '../services/geofencesService'
+import LoadingSpinner from '../components/loading-spinner'
+import Map from '../components/map'
+import { geofencesService, type BackendGeofence } from '../services/geofences.service'
 import { formatDate } from '../utils/format'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Button } from '../components/ui/button'
+import { Badge } from '../components/ui/badge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
 
 const Geofences = () => {
   const [geofences, setGeofences] = useState<BackendGeofence[]>([])
@@ -50,121 +54,120 @@ const Geofences = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Geofences</h1>
-          <p className="text-gray-600">Manage delivery zones and restricted areas</p>
+          <h1 className="text-2xl font-bold">Geofences</h1>
+          <p className="text-muted-foreground">Manage delivery zones and restricted areas</p>
         </div>
-        <button className="btn-primary">
-          <Plus className="w-4 h-4 mr-2" />
+        <Button>
+          <RiAddLine className="w-4 h-4 mr-2" />
           New Geofence
-        </button>
+        </Button>
       </div>
 
       {/* Map */}
-      <div className="card">
-        <div className="card-header">
-          <h3 className="text-lg font-medium text-gray-900">Geofence Map</h3>
-        </div>
-        <Map geofences={geofences} height="500px" />
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Geofence Map</CardTitle>
+          <CardDescription>
+            View and manage all geofences on the interactive map
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Map geofences={geofences} height="500px" />
+        </CardContent>
+      </Card>
 
       {/* Geofences List */}
-      <div className="card">
-        <div className="card-header">
-          <h3 className="text-lg font-medium text-gray-900">All Geofences</h3>
-        </div>
-        {geofences.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Radius
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Created
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {geofences.map((geofence) => (
-                  <tr key={geofence.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{geofence.name}</p>
-                        <p className="text-xs text-gray-500">
-                          Radius: {geofence.radius}m
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`status-badge ${
-                        geofence.type === 'pickup' ? 'bg-blue-100 text-blue-800' :
-                        geofence.type === 'delivery' ? 'bg-green-100 text-green-800' :
-                        geofence.type === 'restricted' ? 'bg-red-100 text-red-800' :
-                        'bg-purple-100 text-purple-800'
-                      }`}>
-                        {geofence.type}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {geofence.radius}m
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <button
-                        onClick={() => handleToggleGeofence(geofence.id)}
-                        className={`status-badge ${
-                          geofence.is_active 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {geofence.is_active ? 'Active' : 'Inactive'}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(geofence.created_at)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button className="text-primary-600 hover:text-primary-900 mr-4">
-                        Edit
-                      </button>
-                      <button className="text-red-600 hover:text-red-900">
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <MapPin className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No geofences</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Get started by creating your first geofence.
-            </p>
-            <div className="mt-6">
-              <button className="btn-primary">
-                <Plus className="w-4 h-4 mr-2" />
-                Create Geofence
-              </button>
+      <Card>
+        <CardHeader>
+          <CardTitle>All Geofences</CardTitle>
+          <CardDescription>
+            {geofences.length} geofence{geofences.length !== 1 ? 's' : ''} configured
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {geofences.length > 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Radius</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {geofences.map((geofence) => (
+                    <TableRow key={geofence.id}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{geofence.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Radius: {geofence.radius}m
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={
+                          geofence.type === 'pickup' ? 'secondary' :
+                          geofence.type === 'delivery' ? 'default' :
+                          geofence.type === 'restricted' ? 'destructive' :
+                          'outline'
+                        }>
+                          {geofence.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {geofence.radius}m
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleGeofence(geofence.id)}
+                        >
+                          <Badge variant={geofence.is_active ? 'default' : 'secondary'}>
+                            {geofence.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </Button>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {formatDate(geofence.created_at)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button variant="ghost" size="sm">
+                            <RiEditLine className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm">
+                            <RiDeleteBinLine className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
-          </div>
-        )}
-      </div>
+          ) : (
+            <div className="text-center py-12">
+              <RiMapPinLine className="mx-auto h-12 w-12 text-muted-foreground" />
+              <h3 className="mt-2 text-sm font-medium">No geofences</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Get started by creating your first geofence.
+              </p>
+              <div className="mt-6">
+                <Button>
+                  <RiAddLine className="w-4 h-4 mr-2" />
+                  Create Geofence
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

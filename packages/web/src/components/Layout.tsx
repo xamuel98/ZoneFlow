@@ -1,21 +1,20 @@
-import { Outlet } from 'react-router-dom'
-import Sidebar from './Sidebar'
-import Header from './Header'
+import { Outlet } from 'react-router-dom';
+import { AppSidebar } from './app-sidebar';
+import { AppHeader } from './app-header';
+import { SidebarProvider, SidebarInset } from './ui/sidebar';
 
 const Layout = () => {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Sidebar />
-      <div className="lg:pl-64">
-        <Header />
-        <main className="py-6">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <Outlet />
-          </div>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset className="overflow-hidden px-4 md:px-6 lg:px-8">
+        <AppHeader />
+        <main className="w-full mx-auto max-w-6xl flex flex-1 flex-col gap-4 lg:gap-6 py-4 lg:py-6">
+          <Outlet />
         </main>
-      </div>
-    </div>
-  )
-}
+      </SidebarInset>
+    </SidebarProvider>
+  );
+};
 
-export default Layout
+export default Layout;

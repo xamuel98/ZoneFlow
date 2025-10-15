@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
-import { validateRequest, registerSchema, loginSchema } from '../utils/validation.js';
+import { validateRequest, registerSchema, loginSchema, acceptInviteSchema } from '../utils/validation.js';
 import { ResponseHandler } from '../utils/response.js';
-import { AuthService } from '../services/AuthService.js';
+import { AuthService } from '../services/auth.service';
 import { ServiceError, NotFoundError, ValidationError, UnauthorizedError, ConflictError } from '../types/services.js';
 
 const auth = new Hono();
@@ -117,3 +117,30 @@ auth.post('/refresh', async (c) => {
 });
 
 export default auth;
+
+// Accept invitation (public)
+auth.post('/accept-invite', async (c) => {
+  try {
+    const body = await c.req.json();
+    const data = validateRequest(acceptInviteSchema, body);
+
+    const result = await AuthService.acceptInvite(data.token, data.password);
+    return ResponseHandler.success(c, result, 'Invitation accepted');
+
+  } catch (error: unknown) {
+    console.error('Accept invite error:', error);
+    if (error instanceof ValidationError) {
+      return ResponseHandler.badRequest(c, error.message);
+    }
+    if (error instanceof UnauthorizedError) {
+      return ResponseHandler.unauthorized(c, error.message);
+    }
+    if (error instanceof NotFoundError) {
+      return ResponseHandler.notFound(c, 'User');
+    }
+    if (error instanceof ServiceError) {
+      return ResponseHandler.serverError(c, error.message);
+    }
+    return ResponseHandler.serverError(c, 'Failed to accept invitation');
+  }
+});

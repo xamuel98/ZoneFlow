@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ValidationError } from '../types/services.js';
 
 // User validation schemas
 export const registerSchema = z.object({
@@ -64,6 +65,21 @@ export const createBusinessSchema = z.object({
   email: z.string().email().optional(),
 });
 
+// Driver validation schemas
+export const createDriverSchema = z.object({
+  name: z.string().min(2, 'Driver name must be at least 2 characters'),
+  email: z.string().email('Invalid email format'),
+  phone: z.string().min(10, 'Phone number must be at least 10 characters'),
+  password: z.string().min(8, 'Password must be at least 8 characters').optional(),
+  vehicleType: z.string().optional(),
+  licensePlate: z.string().optional(),
+  isAvailable: z.boolean().default(true),
+});
+
+export const bulkCreateDriverSchema = z.object({
+  drivers: z.array(createDriverSchema).min(1, 'At least one driver is required'),
+});
+
 // Validation helper function
 export const validateRequest = <T>(schema: z.ZodSchema<T>, data: unknown): T => {
   try {
@@ -71,8 +87,27 @@ export const validateRequest = <T>(schema: z.ZodSchema<T>, data: unknown): T => 
   } catch (error) {
     if (error instanceof z.ZodError) {
       const message = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
-      throw new Error(`Validation failed: ${message}`);
+      throw new ValidationError(`Validation failed: ${message}`);
     }
     throw error;
   }
 };
+
+// Driver update schema (exclude password updates via this route)
+export const updateDriverSchema = createDriverSchema.omit({ password: true }).partial();
+
+// Geofence update schema (partial)
+export const updateGeofenceSchema = createGeofenceSchema.partial();
+
+// Accept invite schema
+export const acceptInviteSchema = z.object({
+  token: z.string().min(10, 'Invalid token'),
+  password: z.string().min(8, 'Password must be at least 8 characters')
+});
+
+// Orders list filter schema
+export const orderListFilterSchema = z.object({
+  status: z.enum(['pending','assigned','picked_up','in_transit','delivered','cancelled']).optional(),
+  priority: z.enum(['low','medium','high','urgent']).optional(),
+  driverId: z.string().optional(),
+});

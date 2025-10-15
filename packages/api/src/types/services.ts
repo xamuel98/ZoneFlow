@@ -179,6 +179,54 @@ export interface DriverPerformance {
   avg_delivery_time_minutes?: number;
 }
 
+// Driver Service Types
+export interface CreateDriverData {
+  name: string;
+  email: string;
+  phone: string;
+  password?: string;
+  vehicleType?: string;
+  licensePlate?: string;
+  isAvailable?: boolean;
+}
+
+export interface BulkCreateDriverData {
+  drivers: CreateDriverData[];
+}
+
+export interface DriverImportResult {
+  success: number;
+  failed: number;
+  errors: Array<{
+    row: number;
+    data: any;
+    error: string;
+  }>;
+  successfulDrivers: Array<{
+    id: string;
+    name: string;
+    email: string;
+  }>;
+}
+
+export interface DriverWithUser {
+  id: string;
+  user_id: string;
+  business_id: string;
+  vehicle_type?: string;
+  license_plate?: string;
+  is_available: boolean;
+  current_latitude?: number;
+  current_longitude?: number;
+  last_location_update?: string;
+  created_at: string;
+  updated_at: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: string;
+}
+
 // Geofence Service Types
 export interface CreateGeofenceData {
   name: string;

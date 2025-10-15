@@ -8,7 +8,8 @@ import {
   mapIcons,
   calculateBounds
 } from '../utils/map'
-import type { Order, Geofence } from '@zoneflow/shared'
+import type { Order } from '@zoneflow/shared'
+import type { BackendGeofence } from '../services/geofences.service'
 
 interface MapProps {
   orders?: Order[]
@@ -20,7 +21,7 @@ interface MapProps {
     is_available: boolean
     current_order_id?: string
   }>
-  geofences?: Geofence[]
+  geofences?: BackendGeofence[]
   center?: [number, number]
   zoom?: number
   height?: string
@@ -136,18 +137,21 @@ const Map = ({
     // Add geofence circles
     geofences.forEach((geofence) => {
       const color = {
-        circle: '#10b981',
-        polygon: '#8b5cf6'
+        pickup: '#10b981',
+        delivery: '#3b82f6',
+        restricted: '#ef4444',
+        custom: '#8b5cf6'
       }[geofence.type] || '#8b5cf6'
 
-      if (geofence.type === 'circle' && geofence.center_lat && geofence.center_lng) {
+      // For BackendGeofence, we render all types as circles since they have center_lat/center_lng
+      if (geofence.center_lat && geofence.center_lng) {
         L.circle([geofence.center_lat, geofence.center_lng], {
           radius: geofence.radius || 100,
           color: color,
           fillColor: color,
           fillOpacity: 0.1,
           weight: 2,
-          opacity: geofence.active ? 0.8 : 0.3
+          opacity: geofence.is_active ? 0.8 : 0.3
         })
           .bindPopup(`
             <div class="p-2">
@@ -155,7 +159,7 @@ const Map = ({
               <p class="text-sm text-gray-600">Type: ${geofence.type}</p>
               <p class="text-sm text-gray-600">Radius: ${geofence.radius || 100}m</p>
               <p class="text-xs text-gray-500">
-                Status: ${geofence.active ? 'Active' : 'Inactive'}
+                Status: ${geofence.is_active ? 'Active' : 'Inactive'}
               </p>
             </div>
           `)

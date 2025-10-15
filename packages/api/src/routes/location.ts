@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { authMiddleware } from '../middleware/auth.js';
 import { validateRequest, updateLocationSchema } from '../utils/validation.js';
 import { ResponseHandler } from '../utils/response.js';
-import { LocationService } from '../services/LocationService.js';
+import { LocationService } from '../services/location.service';
 import { ServiceError, NotFoundError, ValidationError, ForbiddenError } from '../types/services.js';
 
 const location = new Hono<{ Variables: { user: import('../types/context.js').AuthUser } }>();
@@ -44,8 +44,10 @@ location.post('/update', async (c) => {
 location.get('/history', async (c) => {
   try {
     const user = c.get('user');
-    const page = parseInt(c.req.query('page') || '1');
-    const limit = parseInt(c.req.query('limit') || '50');
+    const pageRaw = parseInt(c.req.query('page') || '1');
+    const limitRaw = parseInt(c.req.query('limit') || '50');
+    const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 100) : 50;
     const orderId = c.req.query('orderId');
 
     const result = await LocationService.getLocationHistory(user.id, {

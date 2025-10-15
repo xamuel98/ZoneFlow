@@ -12,10 +12,30 @@ export const createTables = () => {
       business_id TEXT,
       phone TEXT,
       is_active BOOLEAN DEFAULT 1,
+      is_invited BOOLEAN DEFAULT 0,
+      invite_token_hash TEXT,
+      invite_expires_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Backfill invite columns for existing databases
+  try {
+    const columns = db.prepare(`PRAGMA table_info(users)`).all() as Array<{ name: string }>;
+    const names = new Set(columns.map(c => c.name));
+    if (!names.has('is_invited')) {
+      db.exec(`ALTER TABLE users ADD COLUMN is_invited BOOLEAN DEFAULT 0`);
+    }
+    if (!names.has('invite_token_hash')) {
+      db.exec(`ALTER TABLE users ADD COLUMN invite_token_hash TEXT`);
+    }
+    if (!names.has('invite_expires_at')) {
+      db.exec(`ALTER TABLE users ADD COLUMN invite_expires_at DATETIME`);
+    }
+  } catch (e) {
+    console.warn('Could not ensure invite columns on users table:', e);
+  }
 
   // Businesses table
   db.exec(`
