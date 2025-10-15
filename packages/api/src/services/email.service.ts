@@ -20,6 +20,34 @@ export class EmailService {
     await client.emails.send({ from, to: email, subject, html });
   }
 
+  static async sendEmail(to: string, subject: string, html: string) {
+    const from = process.env.EMAIL_FROM || 'no-reply@zoneflow.app';
+    const client = this.getClient();
+    
+    if (process.env.NODE_ENV !== 'production' && process.env.RESEND_API_KEY === undefined) {
+      console.log(`[DEV] Email to ${to}: ${subject}`);
+      return;
+    }
+    
+    await client.emails.send({ from, to, subject, html });
+  }
+
+  static async sendTemplateEmail(to: string, subject: string, template: string, data: any) {
+    // For now, just use the basic sendEmail method
+    // In the future, this could be enhanced with proper template rendering
+    const html = this.renderTemplate(template, data);
+    return this.sendEmail(to, subject, html);
+  }
+
+  private static renderTemplate(template: string, data: any): string {
+    // Simple template rendering - replace {{key}} with data[key]
+    let html = template;
+    for (const [key, value] of Object.entries(data)) {
+      html = html.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
+    }
+    return html;
+  }
+
   private static renderInviteHtml(name: string, url: string): string {
     return `
 <!doctype html>
