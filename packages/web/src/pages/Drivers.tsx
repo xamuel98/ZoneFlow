@@ -1,19 +1,30 @@
 import { Outlet } from 'react-router-dom';
 import { useDriverStore } from '../stores/driver-store';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import DriverList from '../components/drivers/driver-list';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import CreateDriverDialog from '../components/drivers/create-driver-dialog';
 import EditDriverDialog from '../components/drivers/edit-driver-dialog';
-import ImportDriversDialog from '../components/drivers/import-drivers-dialog';
-import { Users, UserCheck, UserX, Activity } from 'lucide-react';
+import { InviteDriverDialog } from '../components/drivers/invite-driver-dialog';
+import { DriverInvitationsList } from '../components/drivers/driver-invitations-list';
+import { PermissionGuard } from '../components/auth/permission-guard';
+import { usePermissions } from '../hooks/use-permissions';
+import { Users, UserCheck, UserX, Activity, Mail } from 'lucide-react';
 
 const DriversPage = () => {
   const { stats, fetchStats } = useDriverStore();
+  const { hasPermission } = usePermissions();
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     fetchStats();
-  }, [fetchStats]);
+  }, [fetchStats, refreshKey]);
+
+  const handleRefresh = () => {
+    setRefreshKey(prev => prev + 1);
+    fetchStats();
+  };
 
   return (
     <div className="space-y-6">
@@ -82,13 +93,42 @@ const DriversPage = () => {
         </Card>
       </div>
 
-      {/* Driver List */}
-      <DriverList />
+      {/* Driver Management Tabs */}
+      <Tabs defaultValue="drivers" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="drivers" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Drivers
+          </TabsTrigger>
+          <PermissionGuard permissions={['invite_drivers']} showFallback={false}>
+            <TabsTrigger value="invitations" className="flex items-center gap-2">
+              <Mail className="h-4 w-4" />
+              Invitations
+            </TabsTrigger>
+          </PermissionGuard>
+        </TabsList>
+
+        <TabsContent value="drivers" className="space-y-6">
+          <DriverList />
+        </TabsContent>
+
+        <PermissionGuard permissions={['invite_drivers']} showFallback={false}>
+          <TabsContent value="invitations" className="space-y-6">
+            <DriverInvitationsList onRefresh={handleRefresh} />
+          </TabsContent>
+        </PermissionGuard>
+      </Tabs>
 
       {/* Modal Dialogs */}
-      <CreateDriverDialog />
-      <EditDriverDialog />
-      <ImportDriversDialog />
+      <PermissionGuard permissions={['create_drivers']} showFallback={false}>
+        <CreateDriverDialog />
+      </PermissionGuard>
+      <PermissionGuard permissions={['edit_drivers']} showFallback={false}>
+        <EditDriverDialog />
+      </PermissionGuard>
+      <PermissionGuard permissions={['invite_drivers']} showFallback={false}>
+        <InviteDriverDialog onSuccess={handleRefresh} />
+      </PermissionGuard>
 
       {/* Outlet for nested routes */}
       <Outlet />

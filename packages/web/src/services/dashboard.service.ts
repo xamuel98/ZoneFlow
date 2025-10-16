@@ -40,7 +40,7 @@ interface ActivityItem {
 }
 
 interface MapData {
-  orders: Array<Order & {
+  activeOrders: Array<Order & {
     driver_name?: string
     current_latitude?: number
     current_longitude?: number

@@ -170,6 +170,42 @@ export const createTables = () => {
     )
   `);
 
+  // Driver invitations table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS driver_invitations (
+      id TEXT PRIMARY KEY,
+      business_id TEXT NOT NULL,
+      email TEXT NOT NULL,
+      name TEXT NOT NULL,
+      phone TEXT,
+      vehicle_type TEXT,
+      license_plate TEXT,
+      message TEXT,
+      status TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'cancelled', 'expired')) DEFAULT 'pending',
+      token TEXT UNIQUE NOT NULL,
+      expires_at DATETIME NOT NULL,
+      invited_by TEXT NOT NULL,
+      accepted_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (business_id) REFERENCES businesses(id),
+      FOREIGN KEY (invited_by) REFERENCES users(id)
+    )
+  `);
+
+  // Backfill message column for existing driver_invitations table
+  try {
+    const columns = db.prepare(`PRAGMA table_info(driver_invitations)`).all() as Array<{ name: string }>;
+    const names = new Set(columns.map(c => c.name));
+    if (!names.has('message')) {
+      console.log('🔄 Adding message column to driver_invitations table...');
+      db.exec(`ALTER TABLE driver_invitations ADD COLUMN message TEXT`);
+      console.log('✅ Message column added successfully');
+    }
+  } catch (e) {
+    console.warn('Could not ensure message column on driver_invitations table:', e);
+  }
+
   // Create indexes for better performance
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -187,6 +223,11 @@ export const createTables = () => {
     CREATE INDEX IF NOT EXISTS idx_geofence_events_geofence_id ON geofence_events(geofence_id);
     CREATE INDEX IF NOT EXISTS idx_geofence_events_driver_id ON geofence_events(driver_id);
     CREATE INDEX IF NOT EXISTS idx_geofence_events_timestamp ON geofence_events(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_driver_invitations_business_id ON driver_invitations(business_id);
+    CREATE INDEX IF NOT EXISTS idx_driver_invitations_email ON driver_invitations(email);
+    CREATE INDEX IF NOT EXISTS idx_driver_invitations_token ON driver_invitations(token);
+    CREATE INDEX IF NOT EXISTS idx_driver_invitations_status ON driver_invitations(status);
+    CREATE INDEX IF NOT EXISTS idx_driver_invitations_expires_at ON driver_invitations(expires_at);
   `);
 
   console.log('✅ Database tables created successfully');
@@ -196,6 +237,7 @@ export const dropTables = () => {
   const tables = [
     'geofence_events',
     'location_history', 
+    'driver_invitations',
     'webhooks',
     'geofences',
     'orders',

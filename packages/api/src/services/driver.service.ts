@@ -354,21 +354,19 @@ export class DriverService {
    */
   static async deleteDriver(driverId: string, businessId: string): Promise<void> {
     try {
-      // Check if driver exists
-      const driver = await this.getDriverById(driverId, businessId);
+      // Check if driver exists and belongs to business
+      const driver = db.prepare(`
+        SELECT d.id, d.user_id 
+        FROM drivers d
+        JOIN users u ON d.user_id = u.id
+        WHERE d.id = ? AND u.business_id = ?
+      `).get(driverId, businessId) as { id: string; user_id: string } | undefined;
 
-      // Check if driver has active orders
-      const anyOrders = db.prepare(`
-        SELECT COUNT(*) as count 
-        FROM orders 
-        WHERE driver_id = ?
-      `).get(driverId) as { count: number };
-
-      if (anyOrders.count > 0) {
-        throw new ValidationError('Cannot delete driver with existing orders. Reassign or archive orders first.');
+      if (!driver) {
+        throw new NotFoundError('Driver not found');
       }
 
-      // Start transaction
+      // Start transaction to delete both driver and user records
       const transaction = db.transaction(() => {
         // Delete driver record
         db.prepare('DELETE FROM drivers WHERE id = ?').run(driverId);
@@ -379,11 +377,44 @@ export class DriverService {
 
       transaction();
     } catch (error) {
-      if (error instanceof NotFoundError || error instanceof ValidationError) {
+      if (error instanceof ServiceError) {
         throw error;
       }
-      console.error('Delete driver error:', error);
+      console.error('Error deleting driver:', error);
       throw new ServiceError('Failed to delete driver');
+    }
+  }
+
+  /**
+   * Get driver statistics for a business
+   */
+  static async getDriverStats(businessId: string): Promise<{
+    total: number;
+    active: number;
+    available: number;
+    busy: number;
+  }> {
+    try {
+      const stats = db.prepare(`
+        SELECT 
+          COUNT(*) as total,
+          COUNT(CASE WHEN u.is_active = 1 THEN 1 END) as active,
+          COUNT(CASE WHEN d.is_available = 1 THEN 1 END) as available,
+          COUNT(CASE WHEN d.is_available = 0 AND u.is_active = 1 THEN 1 END) as busy
+        FROM drivers d
+        JOIN users u ON d.user_id = u.id
+        WHERE u.business_id = ?
+      `).get(businessId) as any;
+
+      return {
+        total: stats.total || 0,
+        active: stats.active || 0,
+        available: stats.available || 0,
+        busy: stats.busy || 0
+      };
+    } catch (error) {
+      console.error('Error getting driver stats:', error);
+      throw new ServiceError('Failed to get driver statistics');
     }
   }
 }

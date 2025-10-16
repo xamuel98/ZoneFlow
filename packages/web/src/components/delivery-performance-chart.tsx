@@ -1,6 +1,6 @@
 'use client';
 
-import { useId } from 'react';
+import { useId, useMemo, memo } from 'react';
 import {
   CartesianGrid,
   Line,
@@ -19,7 +19,7 @@ import {
 import { CustomTooltipContent } from './charts-extra';
 import { Badge } from '@/components/ui/badge';
 
-// Subscriber data for the last 12 months
+// Subscriber data for the last 12 months - memoized to prevent recreation
 const chartData = [
   { month: 'Jan 2025', actual: 5000, projected: 2000 },
   { month: 'Feb 2025', actual: 10000, projected: 8000 },
@@ -54,7 +54,8 @@ interface CustomCursorProps {
   className?: string;
 }
 
-function CustomCursor(props: CustomCursorProps) {
+// Memoize CustomCursor to prevent unnecessary re-renders
+const CustomCursor = memo(function CustomCursor(props: CustomCursorProps) {
   const { fill, pointerEvents, height, points, className } = props;
 
   if (!points || points.length === 0) {
@@ -86,10 +87,42 @@ function CustomCursor(props: CustomCursorProps) {
       />
     </>
   );
-}
+});
 
-export function DeliveryPerformanceChart() {
+// Memoize the main component to prevent unnecessary re-renders
+export const DeliveryPerformanceChart = memo(function DeliveryPerformanceChart() {
   const id = useId();
+
+  // Memoize expensive calculations and configurations
+  const memoizedConfig = useMemo(() => ({
+    chartMargin: { left: -12, right: 12, top: 12 },
+    gradientId: `${id}-gradient`,
+    activeDotConfig: {
+      r: 5,
+      fill: 'hsl(var(--chart-1))',
+      stroke: 'hsl(var(--background))',
+      strokeWidth: 2,
+    },
+    tickFormatter: (value: string) => value.slice(0, 3),
+    yAxisFormatter: (value: number) => {
+      if (value === 0) return '$0';
+      return `${value / 1000}k`;
+    },
+    valueFormatter: (value: number) => `$${value.toLocaleString()}`,
+  }), [id]);
+
+  // Memoize color map and label map to prevent recreation
+  const tooltipConfig = useMemo(() => ({
+    colorMap: {
+      actual: 'hsl(var(--chart-1))',
+      projected: 'hsl(var(--chart-3))',
+    },
+    labelMap: {
+      actual: 'Actual',
+      projected: 'Projected',
+    },
+    dataKeys: ['actual', 'projected'],
+  }), []);
 
   return (
     <Card className="bg-card text-card-foreground flex flex-col border-t border-r-0 border-l-0 border-b-0 py-6 gap-4">
@@ -109,7 +142,7 @@ export function DeliveryPerformanceChart() {
               <div
                 aria-hidden="true"
                 className="size-1.5 shrink-0 rounded-sm bg-chart-1"
-              ></div>
+              />
               <div className="text-[13px]/3 text-muted-foreground/50">
                 Actual
               </div>
@@ -118,7 +151,7 @@ export function DeliveryPerformanceChart() {
               <div
                 aria-hidden="true"
                 className="size-1.5 shrink-0 rounded-sm bg-chart-3"
-              ></div>
+              />
               <div className="text-[13px]/3 text-muted-foreground/50">
                 Projected
               </div>
@@ -130,14 +163,15 @@ export function DeliveryPerformanceChart() {
         <ChartContainer
           config={chartConfig}
           className="aspect-auto h-60 w-full [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-(--chart-1)/15 [&_.recharts-rectangle.recharts-tooltip-inner-cursor]:fill-white/20"
+          style={{ willChange: 'transform' }} // Optimize for potential transforms
         >
           <LineChart
             accessibilityLayer
             data={chartData}
-            margin={{ left: -12, right: 12, top: 12 }}
+            margin={memoizedConfig.chartMargin}
           >
             <defs>
-              <linearGradient id={`${id}-gradient`} x1="0" y1="0" x2="1" y2="0">
+              <linearGradient id={memoizedConfig.gradientId} x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0%" stopColor="hsl(var(--chart-2))" />
                 <stop offset="100%" stopColor="hsl(var(--chart-1))" />
               </linearGradient>
@@ -151,16 +185,13 @@ export function DeliveryPerformanceChart() {
               dataKey="month"
               tickLine={false}
               tickMargin={12}
-              tickFormatter={(value) => value.slice(0, 3)}
+              tickFormatter={memoizedConfig.tickFormatter}
               stroke="hsl(var(--border))"
             />
             <YAxis
               axisLine={false}
               tickLine={false}
-              tickFormatter={(value) => {
-                if (value === 0) return '$0';
-                return `${value / 1000}k`;
-              }}
+              tickFormatter={memoizedConfig.yAxisFormatter}
               interval="preserveStartEnd"
             />
             <Line
@@ -174,16 +205,10 @@ export function DeliveryPerformanceChart() {
             <ChartTooltip
               content={
                 <CustomTooltipContent
-                  colorMap={{
-                    actual: 'hsl(var(--chart-1))',
-                    projected: 'hsl(var(--chart-3))',
-                  }}
-                  labelMap={{
-                    actual: 'Actual',
-                    projected: 'Projected',
-                  }}
-                  dataKeys={['actual', 'projected']}
-                  valueFormatter={(value) => `$${value.toLocaleString()}`}
+                  colorMap={tooltipConfig.colorMap}
+                  labelMap={tooltipConfig.labelMap}
+                  dataKeys={tooltipConfig.dataKeys}
+                  valueFormatter={memoizedConfig.valueFormatter}
                 />
               }
               cursor={<CustomCursor fill="hsl(var(--chart-1))" />}
@@ -191,19 +216,14 @@ export function DeliveryPerformanceChart() {
             <Line
               type="linear"
               dataKey="actual"
-              stroke={`url(#${id}-gradient)`}
+              stroke={`url(#${memoizedConfig.gradientId})`}
               strokeWidth={2}
               dot={false}
-              activeDot={{
-                r: 5,
-                fill: 'hsl(var(--chart-1))',
-                stroke: 'hsl(var(--background))',
-                strokeWidth: 2,
-              }}
+              activeDot={memoizedConfig.activeDotConfig}
             />
           </LineChart>
         </ChartContainer>
       </CardContent>
     </Card>
   );
-}
+});

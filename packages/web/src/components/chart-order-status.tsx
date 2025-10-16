@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ORDER_STATUS_COLORS } from '@/lib/utils';
+import { useMemo } from 'react';
 
 export function ChartOrderStatus({
   orderMetrics,
@@ -11,31 +12,45 @@ export function ChartOrderStatus({
     cancelled: number;
   };
 }) {
-  // Helper to map order status strings to their color classes
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return ORDER_STATUS_COLORS.pending;
-      case 'assigned':
-        return ORDER_STATUS_COLORS.assigned;
-      case 'picked_up':
-        return ORDER_STATUS_COLORS.picked_up;
-      case 'in_transit':
-        return ORDER_STATUS_COLORS.in_transit;
-      case 'delivered':
-        return ORDER_STATUS_COLORS.delivered;
-      case 'cancelled':
-        return ORDER_STATUS_COLORS.cancelled;
-      default:
-        return 'bg-red-500';
-    }
-  };
-
-  // Calculate the total number of orders
-  const totalOrders = Object.values(orderMetrics).reduce(
-    (acc, count) => acc + count,
-    0
-  );
+  // Memoize calculations to prevent recalculation on every render
+  const { statusData, totalOrders } = useMemo(() => {
+    const total = Object.values(orderMetrics).reduce((acc, count) => acc + count, 0);
+    
+    const data = Object.entries(orderMetrics).map(([status, count]) => {
+      let color: string;
+      switch (status) {
+        case 'pending':
+          color = ORDER_STATUS_COLORS.pending;
+          break;
+        case 'assigned':
+          color = ORDER_STATUS_COLORS.assigned;
+          break;
+        case 'picked_up':
+          color = ORDER_STATUS_COLORS.picked_up;
+          break;
+        case 'in_transit':
+          color = ORDER_STATUS_COLORS.in_transit;
+          break;
+        case 'delivered':
+          color = ORDER_STATUS_COLORS.delivered;
+          break;
+        case 'cancelled':
+          color = ORDER_STATUS_COLORS.cancelled;
+          break;
+        default:
+          color = 'bg-red-500';
+      }
+      
+      return {
+        status,
+        count,
+        color,
+        percentage: total > 0 ? (count / total) * 100 : 0,
+      };
+    });
+    
+    return { statusData: data, totalOrders: total };
+  }, [orderMetrics]);
 
   return (
     <Card className="bg-card text-card-foreground flex flex-col border-t border-l-0 xl:border-l border-r-0 border-b-0 py-6 gap-5">
@@ -55,27 +70,32 @@ export function ChartOrderStatus({
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
+        {/* Use CSS custom properties instead of inline styles to avoid layout calculations */}
         <div className="flex gap-1 h-5">
-          {Object.entries(orderMetrics).map(([status, count]) => (
+          {statusData.map(({ status, color, percentage }) => (
             <div
               key={status}
-              className="h-full"
+              className="h-full transition-all duration-200 ease-out"
               style={{
-                backgroundColor: getStatusColor(status),
-                width: `${(count / totalOrders) * 100}%`,
+                backgroundColor: color,
+                width: `${percentage}%`,
+                willChange: 'width', // Optimize for width changes
               }}
-            ></div>
+            />
           ))}
         </div>
         <div>
           <ul className="text-sm divide-y divide-border">
-            {Object.entries(orderMetrics).map(([status, count]) => (
+            {statusData.map(({ status, count, color }) => (
               <li key={status} className="py-2 flex items-center gap-2">
                 <span
                   className="size-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: getStatusColor(status) }}
+                  style={{ 
+                    backgroundColor: color,
+                    willChange: 'background-color', // Optimize for color changes
+                  }}
                   aria-hidden="true"
-                ></span>
+                />
                 <span className="grow text-muted-foreground capitalize">
                   {status.replace('_', ' ')}
                 </span>

@@ -1,280 +1,411 @@
-import { useState, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { toast } from 'sonner';
-import { Upload, FileText, Download, AlertCircle } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
 import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Alert, AlertDescription } from '../ui/alert';
+import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
-import { useDriverStore } from '../../stores/driver-store';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../ui/table';
+import {
+  Upload,
+  FileText,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Download,
+  Loader2,
+  X
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { driverService } from '../../services/driver-service';
+import type { DriverImportPreview, ImportProgress } from '../../types';
 
-const ImportDriversDialog = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const { importDrivers, isLoading } = useDriverStore();
-  
+interface ImportDriversDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
+}
+
+type ImportStep = 'upload' | 'preview' | 'importing' | 'complete';
+
+function ImportDriversDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: ImportDriversDialogProps) {
+  const [currentStep, setCurrentStep] = useState<ImportStep>('upload');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [dragActive, setDragActive] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [preview, setPreview] = useState<DriverImportPreview | null>(null);
+  const [progress, setProgress] = useState<ImportProgress | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const isOpen = location.pathname === '/drivers/import';
-
-  const handleOpenChange = (open: boolean) => {
-    if (!open) {
-      navigate('/drivers');
-    }
-  };
-
-  const acceptedFileTypes = '.csv,.xlsx,.xls';
-  const maxFileSize = 10 * 1024 * 1024; // 10MB
-
-  const handleClose = () => {
-    navigate('/drivers');
-    setSelectedFile(null);
-    setUploadProgress(0);
-  };
-
-  const validateFile = (file: File): string | null => {
-    // Check file size
-    if (file.size > maxFileSize) {
-      return 'File size must be less than 10MB';
-    }
-
-    // Check file type
-    const fileExtension = file.name.toLowerCase().split('.').pop();
-    if (!['csv', 'xlsx', 'xls'].includes(fileExtension || '')) {
-      return 'Only CSV and Excel files are supported';
-    }
-
-    return null;
-  };
-
-  const handleFileSelect = (file: File) => {
-    const error = validateFile(file);
-    if (error) {
-      toast.error(error);
-      return;
-    }
-    setSelectedFile(file);
-  };
-
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
     if (file) {
-      handleFileSelect(file);
+      setSelectedFile(file);
+      handlePreview(file);
     }
-  };
+  }, []);
 
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
-    }
-  };
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'text/csv': ['.csv'],
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'application/vnd.ms-excel': ['.xls']
+    },
+    maxFiles: 1,
+    maxSize: 10 * 1024 * 1024, // 10MB
+  });
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      handleFileSelect(file);
+  const handlePreview = async (file: File) => {
+    setIsLoading(true);
+    try {
+      const previewData = await driverService.previewImport(file);
+      setPreview(previewData);
+      setCurrentStep('preview');
+    } catch (error: any) {
+      toast.error('Failed to preview file', {
+        description: error.message,
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleImport = async () => {
-    if (!selectedFile) {
-      toast.error('Please select a file to import');
-      return;
-    }
+    if (!selectedFile) return;
+
+    setCurrentStep('importing');
+    setProgress({ processed: 0, total: preview?.validRows.length || 0, errors: [] });
 
     try {
-      setUploadProgress(0);
-      
-      // Simulate upload progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return prev;
-          }
-          return prev + 10;
-        });
-      }, 200);
+      await driverService.importDriversWithProgress(
+        selectedFile,
+        (progressData) => {
+          setProgress(progressData);
+        }
+      );
 
-      await importDrivers(selectedFile);
-      
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-      
-      toast.success('Drivers imported successfully');
-      handleClose();
-    } catch (error) {
-      console.error('Failed to import drivers:', error);
-      toast.error('Failed to import drivers. Please check the file format and try again.');
-      setUploadProgress(0);
+      setCurrentStep('complete');
+      toast.success('Drivers imported successfully', {
+        description: `${progress?.processed || 0} drivers processed`,
+      });
+      onSuccess?.();
+    } catch (error: any) {
+      toast.error('Import failed', {
+        description: error.message,
+      });
+      setCurrentStep('preview');
     }
   };
 
-  const downloadTemplate = () => {
-    // Updated template to match backend CreateDriverData schema
-    const csvContent = `name,email,phone,password,vehicleType,licensePlate,isAvailable
-John Doe,john.doe@example.com,+1234567890,password123,car,ABC123,true
-Jane Smith,jane.smith@example.com,+1987654321,password456,motorcycle,XYZ789,true
-Mike Johnson,mike.johnson@example.com,+1122334455,password789,van,DEF456,false`;
+  const handleClose = () => {
+    setCurrentStep('upload');
+    setSelectedFile(null);
+    setPreview(null);
+    setProgress(null);
+    onOpenChange(false);
+  };
 
+  const downloadTemplate = () => {
+    const csvContent = 'name,email,phone,license_number,vehicle_type,status\nJohn Doe,john@example.com,+1234567890,DL123456,sedan,available\nJane Smith,jane@example.com,+1234567891,DL123457,suv,available';
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'driver-import-template.csv';
+    a.download = 'drivers-import-template.csv';
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  const renderUploadStep = () => (
+    <div className="space-y-6">
+      <div
+        {...getRootProps()}
+        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+          isDragActive
+            ? 'border-primary bg-primary/5'
+            : 'border-muted-foreground/25 hover:border-primary/50'
+        }`}
+      >
+        <input {...getInputProps()} />
+        <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+        <div className="space-y-2">
+          <p className="text-lg font-medium">
+            {isDragActive ? 'Drop the file here' : 'Drag & drop a file here'}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            or click to select a file
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Supports CSV, XLS, XLSX files (max 10MB)
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-center">
+        <Button variant="outline" onClick={downloadTemplate} className="gap-2">
+          <Download className="h-4 w-4" />
+          Download Template
+        </Button>
+      </div>
+
+      {isLoading && (
+        <div className="flex items-center justify-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-sm">Processing file...</span>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderPreviewStep = () => (
+    <div className="space-y-4">
+      {/* File Info */}
+      <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+        <FileText className="h-5 w-5" />
+        <div className="flex-1">
+          <p className="font-medium">{selectedFile?.name}</p>
+          <p className="text-sm text-muted-foreground">
+            {((selectedFile?.size || 0) / 1024).toFixed(1)} KB
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setCurrentStep('upload')}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Preview Summary */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="text-center p-3 bg-green-50 rounded-lg">
+          <div className="flex items-center justify-center gap-1 mb-1">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <span className="font-medium text-green-600">Valid</span>
+          </div>
+          <p className="text-2xl font-bold text-green-600">
+            {preview?.validRows.length || 0}
+          </p>
+        </div>
+        <div className="text-center p-3 bg-red-50 rounded-lg">
+          <div className="flex items-center justify-center gap-1 mb-1">
+            <XCircle className="h-4 w-4 text-red-600" />
+            <span className="font-medium text-red-600">Invalid</span>
+          </div>
+          <p className="text-2xl font-bold text-red-600">
+            {preview?.invalidRows.length || 0}
+          </p>
+        </div>
+        <div className="text-center p-3 bg-yellow-50 rounded-lg">
+          <div className="flex items-center justify-center gap-1 mb-1">
+            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+            <span className="font-medium text-yellow-600">Duplicates</span>
+          </div>
+          <p className="text-2xl font-bold text-yellow-600">
+            {preview?.duplicates.length || 0}
+          </p>
+        </div>
+      </div>
+
+      {/* Preview Table */}
+      <div className="border rounded-lg max-h-64 overflow-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Status</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Phone</TableHead>
+              <TableHead>License</TableHead>
+              <TableHead>Issues</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {preview?.validRows.slice(0, 5).map((row, index) => (
+              <TableRow key={index}>
+                <TableCell>
+                  <Badge variant="secondary" className="bg-green-100 text-green-800">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Valid
+                  </Badge>
+                </TableCell>
+                <TableCell>{row.name}</TableCell>
+                <TableCell>{row.email}</TableCell>
+                <TableCell>{row.phone}</TableCell>
+                <TableCell>{row.license_number}</TableCell>
+                <TableCell>-</TableCell>
+              </TableRow>
+            ))}
+            {preview?.invalidRows.slice(0, 3).map((row, index) => (
+              <TableRow key={`invalid-${index}`}>
+                <TableCell>
+                  <Badge variant="destructive">
+                    <XCircle className="h-3 w-3 mr-1" />
+                    Invalid
+                  </Badge>
+                </TableCell>
+                <TableCell>{row.data.name || '-'}</TableCell>
+                <TableCell>{row.data.email || '-'}</TableCell>
+                <TableCell>{row.data.phone || '-'}</TableCell>
+                <TableCell>{row.data.license_number || '-'}</TableCell>
+                <TableCell>
+                  <div className="text-xs text-red-600">
+                    {row.errors.join(', ')}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      {(preview?.validRows.length || 0) > 5 && (
+        <p className="text-sm text-muted-foreground text-center">
+          Showing first 5 valid rows. {(preview?.validRows.length || 0) - 5} more rows will be imported.
+        </p>
+      )}
+    </div>
+  );
+
+  const renderImportingStep = () => (
+    <div className="space-y-6 text-center">
+      <div className="flex items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+      <div className="space-y-2">
+        <h3 className="text-lg font-medium">Importing Drivers</h3>
+        <p className="text-muted-foreground">
+          Processing {progress?.processed || 0} of {progress?.total || 0} drivers
+        </p>
+      </div>
+      <Progress 
+        value={progress ? (progress.processed / progress.total) * 100 : 0} 
+        className="w-full"
+      />
+      {progress && progress.errors.length > 0 && (
+        <div className="text-left">
+          <p className="text-sm font-medium text-red-600 mb-2">
+            {progress.errors.length} errors occurred:
+          </p>
+          <div className="max-h-32 overflow-y-auto space-y-1">
+            {progress.errors.slice(0, 5).map((error, index) => (
+              <p key={index} className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                Row {error.row}: {error.message}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderCompleteStep = () => (
+    <div className="space-y-6 text-center">
+      <div className="flex items-center justify-center">
+        <CheckCircle className="h-12 w-12 text-green-600" />
+      </div>
+      <div className="space-y-2">
+        <h3 className="text-lg font-medium">Import Complete</h3>
+        <p className="text-muted-foreground">
+          Successfully imported {progress?.processed || 0} drivers
+        </p>
+        {progress && progress.errors.length > 0 && (
+          <p className="text-sm text-yellow-600">
+            {progress.errors.length} rows had errors and were skipped
+          </p>
+        )}
+      </div>
+    </div>
+  );
+
+  const getStepContent = () => {
+    switch (currentStep) {
+      case 'upload':
+        return renderUploadStep();
+      case 'preview':
+        return renderPreviewStep();
+      case 'importing':
+        return renderImportingStep();
+      case 'complete':
+        return renderCompleteStep();
+    }
+  };
+
+  const getDialogTitle = () => {
+    switch (currentStep) {
+      case 'upload':
+        return 'Import Drivers';
+      case 'preview':
+        return 'Preview Import';
+      case 'importing':
+        return 'Importing Drivers';
+      case 'complete':
+        return 'Import Complete';
+    }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Import Drivers</DialogTitle>
+          <DialogTitle>{getDialogTitle()}</DialogTitle>
           <DialogDescription>
-            Upload a CSV or Excel file to import multiple drivers at once.
+            {currentStep === 'upload' && 'Upload a CSV or Excel file to import drivers'}
+            {currentStep === 'preview' && 'Review the data before importing'}
+            {currentStep === 'importing' && 'Please wait while we import your drivers'}
+            {currentStep === 'complete' && 'Your drivers have been imported successfully'}
           </DialogDescription>
         </DialogHeader>
-        
-        <div className="space-y-6">
-          {/* Template Download */}
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Download the template file to see the required format for importing drivers.
-              <Button
-                variant="link"
-                className="p-0 h-auto ml-2"
-                onClick={downloadTemplate}
-              >
-                <Download className="h-4 w-4 mr-1" />
-                Download Template
-              </Button>
-            </AlertDescription>
-          </Alert>
 
-          {/* File Upload Area */}
-          <div className="space-y-4">
-            <Label>Upload File</Label>
-            <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                dragActive
-                  ? 'border-primary bg-primary/5'
-                  : 'border-muted-foreground/25 hover:border-muted-foreground/50'
-              }`}
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
-            >
-              {selectedFile ? (
-                <div className="space-y-2">
-                  <FileText className="h-12 w-12 mx-auto text-primary" />
-                  <div>
-                    <p className="font-medium">{selectedFile.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatFileSize(selectedFile.size)}
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedFile(null)}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <Upload className="h-12 w-12 mx-auto text-muted-foreground" />
-                  <div>
-                    <p className="text-lg font-medium">
-                      Drop your file here, or{' '}
-                      <Button
-                        variant="link"
-                        className="p-0 h-auto"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        browse
-                      </Button>
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Supports CSV, Excel files up to 10MB
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <Input
-              ref={fileInputRef}
-              type="file"
-              accept={acceptedFileTypes}
-              onChange={handleFileInputChange}
-              className="hidden"
-            />
-          </div>
+        {getStepContent()}
 
-          {/* Upload Progress */}
-          {uploadProgress > 0 && uploadProgress < 100 && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Uploading...</span>
-                <span>{uploadProgress}%</span>
-              </div>
-              <Progress value={uploadProgress} />
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="flex justify-end gap-3">
-            <Button
-              variant="outline"
-              onClick={handleClose}
-              disabled={isLoading}
-            >
+        <DialogFooter>
+          {currentStep === 'upload' && (
+            <Button variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button
-              onClick={handleImport}
-              disabled={!selectedFile || isLoading}
-            >
-              {isLoading ? 'Importing...' : 'Import Drivers'}
+          )}
+          {currentStep === 'preview' && (
+            <>
+              <Button variant="outline" onClick={() => setCurrentStep('upload')}>
+                Back
+              </Button>
+              <Button 
+                onClick={handleImport}
+                disabled={(preview?.validRows.length || 0) === 0}
+              >
+                Import {preview?.validRows.length || 0} Drivers
+              </Button>
+            </>
+          )}
+          {currentStep === 'complete' && (
+            <Button onClick={handleClose}>
+              Close
             </Button>
-          </div>
-        </div>
+          )}
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-};
+}
 
 export default ImportDriversDialog;

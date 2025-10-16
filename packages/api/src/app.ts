@@ -105,6 +105,7 @@ export function createApp(): AppType {
   app.route('/api/location', locationRoutes);
   app.route('/api/dashboard', dashboardRoutes);
   app.route('/api/drivers', driverRoutes);
+  app.route('/api/monitoring', monitoringRoutes);
 
   // Protected routes middleware
   app.use('/api/*/orders/*', authMiddleware);

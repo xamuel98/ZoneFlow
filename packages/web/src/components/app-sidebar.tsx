@@ -3,6 +3,7 @@ import * as React from "react";
 import { NavLink, useLocation } from 'react-router-dom';
 import { TeamSwitcher } from './team-switcher';
 import { useAuthStore } from '../stores/auth.store';
+import { usePermissions } from '../hooks/use-permissions';
 import {
   Sidebar as SidebarPrimitive,
   SidebarContent,
@@ -32,11 +33,65 @@ import {
   RiSettings3Line,
   RiLogoutBoxLine,
   RiMoreLine,
+  RiBarChartLine,
 } from '@remixicon/react';
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof SidebarPrimitive>) {
   const { user, logout } = useAuthStore();
+  const { hasPermission } = usePermissions();
   const location = useLocation();
+
+  // Filter navigation items based on permissions
+  const getFilteredNavItems = () => {
+    const allItems = [
+      { 
+        name: 'Dashboard', 
+        href: '/dashboard', 
+        icon: RiDashboardLine,
+        permission: 'view_dashboard' as const
+      },
+      { 
+        name: 'Orders', 
+        href: '/orders', 
+        icon: RiBox3Line,
+        permission: 'manage_orders' as const
+      },
+      { 
+        name: 'Geofences', 
+        href: '/geofences', 
+        icon: RiMapPinLine,
+        permission: 'manage_geofences' as const
+      },
+      { 
+        name: 'Drivers', 
+        href: '/drivers', 
+        icon: RiTeamLine,
+        permission: 'manage_drivers' as const
+      },
+    ];
+
+    const otherItems = [
+      { 
+        name: 'Monitoring', 
+        href: '/monitoring', 
+        icon: RiBarChartLine,
+        permission: 'view_monitoring' as const
+      },
+      { 
+        name: 'Settings', 
+        href: '/settings', 
+        icon: RiSettings3Line,
+        permission: 'manage_settings' as const
+      },
+    ];
+
+    return {
+      main: allItems.filter(item => hasPermission(item.permission)),
+      other: otherItems.filter(item => hasPermission(item.permission))
+    };
+  };
+
+  const filteredItems = getFilteredNavItems();
 
   const data = {
     teams: [
@@ -54,25 +109,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof SidebarPrim
       },
     ],
     navMain: [
-      {
+      ...(filteredItems.main.length > 0 ? [{
         name: 'Sections',
         href: '#',
-        items: [
-          { name: 'Dashboard', href: '/dashboard', icon: RiDashboardLine },
-          { name: 'Orders', href: '/orders', icon: RiBox3Line },
-          { name: 'Geofences', href: '/geofences', icon: RiMapPinLine },
-          ...(user?.role !== 'driver'
-            ? [{ name: 'Drivers', href: '/drivers', icon: RiTeamLine }]
-            : [])
-        ],
-      },
-      {
+        items: filteredItems.main,
+      }] : []),
+      ...(filteredItems.other.length > 0 ? [{
         name: 'Other',
         href: '#',
-        items: [
-          { name: 'Settings', href: '/settings', icon: RiSettings3Line },
-        ],
-      },
+        items: filteredItems.other,
+      }] : []),
     ],
   };
 

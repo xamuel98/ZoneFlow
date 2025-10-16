@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { createBullBoard } from '@bull-board/api';
 import { BullAdapter } from '@bull-board/api/bullAdapter';
 import { HonoAdapter } from '@bull-board/hono';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { authMiddleware } from '../middleware/auth.js';
 import { 
   emailQueue, 
@@ -13,7 +14,7 @@ import {
 const queueDashboard = new Hono();
 
 // Create Bull Board
-const serverAdapter = new HonoAdapter();
+const serverAdapter = new HonoAdapter(serveStatic);
 serverAdapter.setBasePath('/api/admin/queues');
 
 createBullBoard({
@@ -38,7 +39,7 @@ const adminAuthMiddleware = async (c: any, next: any) => {
 // Mount Bull Board with admin authentication
 queueDashboard.use('/admin/queues/*', authMiddleware);
 queueDashboard.use('/admin/queues/*', adminAuthMiddleware);
-queueDashboard.route('/admin/queues/*', serverAdapter.getRouter());
+queueDashboard.route('/admin/queues/*', serverAdapter.registerPlugin());
 
 // Queue statistics endpoint
 queueDashboard.get('/admin/queue-stats', authMiddleware, adminAuthMiddleware, async (c) => {

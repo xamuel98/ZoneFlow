@@ -1,12 +1,12 @@
+// Load environment variables FIRST before any other imports
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { serve } from '@hono/node-server';
 import { createServer } from 'http';
-import dotenv from 'dotenv';
 import createApp from './app.js';
 import { WebSocketService } from './services/websocket.service.js';
-// import { QueueService } from './services/queue.service.js';
-
-// Load environment variables
-dotenv.config();
+import { QueueService } from './services/queue.service.js';
 
 const app = createApp();
 
@@ -31,8 +31,8 @@ wsServer.listen(wsPort, () => {
 
 // Initialize Queue service and scheduled jobs
 try {
-  // QueueService.setupScheduledJobs();
-  console.log('⚠️  Queue service disabled (Redis not available)');
+  QueueService.setupScheduledJobs();
+  console.log('✅ Queue service and scheduled jobs initialized');
 } catch (error) {
   console.log('⚠️  Queue service initialization failed:', error);
 }

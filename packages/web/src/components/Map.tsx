@@ -16,8 +16,8 @@ interface MapProps {
   drivers?: Array<{
     id: string
     name: string
-    latitude: number
-    longitude: number
+    current_latitude: number | null
+    current_longitude: number | null
     is_available: boolean
     current_order_id?: string
   }>
@@ -57,7 +57,9 @@ const Map = ({
     // Handle map clicks
     if (onMapClick) {
       map.on('click', (e) => {
-        onMapClick(e.latlng.lat, e.latlng.lng)
+        if (e.latlng) {
+          onMapClick(e.latlng.lat, e.latlng.lng)
+        }
       })
     }
 
@@ -116,9 +118,23 @@ const Map = ({
 
     // Add driver markers
     drivers.forEach((driver) => {
+      // Safety check for driver coordinates
+      if (
+        typeof driver.current_latitude !== 'number' || 
+        typeof driver.current_longitude !== 'number' ||
+        driver.current_latitude === null ||
+        driver.current_longitude === null
+      ) {
+        console.warn(`Invalid coordinates for driver ${driver.name}:`, {
+          lat: driver.current_latitude,
+          lng: driver.current_longitude
+        })
+        return
+      }
+
       const icon = driver.is_available ? mapIcons.driver : mapIcons.driverUnavailable
       
-      L.marker([driver.latitude, driver.longitude], { icon })
+      L.marker([driver.current_latitude, driver.current_longitude], { icon })
         .bindPopup(`
           <div class="p-2">
             <h3 class="font-semibold">${driver.name}</h3>
@@ -175,7 +191,17 @@ const Map = ({
         order.delivery_lat && order.delivery_lng ?
         { latitude: order.delivery_lat, longitude: order.delivery_lng } : null
       ]).filter((point): point is { latitude: number; longitude: number } => point !== null),
-      ...drivers.map(driver => ({ latitude: driver.latitude, longitude: driver.longitude })),
+      ...drivers
+        .filter(driver => 
+          typeof driver.current_latitude === 'number' && 
+          typeof driver.current_longitude === 'number' &&
+          driver.current_latitude !== null &&
+          driver.current_longitude !== null
+        )
+        .map(driver => ({ 
+          latitude: driver.current_latitude as number, 
+          longitude: driver.current_longitude as number 
+        })),
       ...geofences.filter(geofence => geofence.center_lat && geofence.center_lng)
         .map(geofence => ({ latitude: geofence.center_lat!, longitude: geofence.center_lng! }))
     ]

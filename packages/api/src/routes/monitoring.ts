@@ -3,7 +3,7 @@ import { metricsService, logger } from '../services/logging.service.js';
 import { cacheService } from '../services/redis.service.js';
 import { authMiddleware } from '../middleware/auth.js';
 
-const monitoring = new Hono();
+const monitoring = new Hono<{ Variables: { user: import('../types/context.js').AuthUser } }>();
 
 // Health check endpoint (public)
 monitoring.get('/health', async (c) => {

@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { RiEyeLine, RiEyeOffLine, RiTruckLine, RiMailLine, RiLockLine, RiUserLine, RiBuildingLine } from '@remixicon/react'
-import { toast } from 'sonner'
 import { useAuthStore } from '../stores/auth.store'
 import LoadingSpinner from '../components/loading-spinner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
@@ -9,6 +8,8 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
+import { useNotifications } from '../components/ui/notification-system'
+import EnhancedLoading from '../components/ui/enhanced-loading'
 
 const Login = () => {
   const [isLogin, setIsLogin] = useState(true)
@@ -23,6 +24,7 @@ const Login = () => {
   })
 
   const { login, register } = useAuthStore()
+  const notifications = useNotifications()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,7 +33,9 @@ const Login = () => {
     try {
       if (isLogin) {
         await login(formData.email, formData.password)
-        toast.success('Welcome back!')
+        notifications.success('Welcome back!', {
+          description: 'You have been successfully logged in.',
+        })
       } else {
         await register({
           email: formData.email,
@@ -40,10 +44,19 @@ const Login = () => {
           role: formData.role,
           businessName: formData.role === 'business_owner' ? formData.businessName : undefined
         })
-        toast.success('Account created successfully!')
+        notifications.success('Account created successfully!', {
+          description: 'Welcome to ZoneFlow. You can now start managing your logistics.',
+        })
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Authentication failed')
+      const errorMessage = error.response?.data?.error || 'Authentication failed'
+      notifications.error(isLogin ? 'Login failed' : 'Registration failed', {
+        description: errorMessage,
+        action: {
+          label: 'Try Again',
+          onClick: () => handleSubmit(e),
+        },
+      })
     } finally {
       setIsLoading(false)
     }
@@ -206,37 +219,39 @@ const Login = () => {
               {/* Submit button */}
               <Button
                 type="submit"
+                className="w-full"
                 disabled={isLoading}
-                className="w-full mt-6"
-                size="lg"
               >
-                {isLoading && <LoadingSpinner size="sm" className="mr-2" />}
-                {isLogin ? 'Sign in' : 'Create account'}
+                {isLoading ? (
+                  <EnhancedLoading size="sm" variant="spinner" className="mr-2" />
+                ) : null}
+                {isLogin ? 'Sign In' : 'Create Account'}
               </Button>
             </form>
 
-            {/* Toggle between login/register */}
+            {/* Toggle between login and register */}
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
-                {isLogin ? "Don't have an account? " : 'Already have an account? '}
+                {isLogin ? "Don't have an account?" : 'Already have an account?'}
+                {' '}
                 <Button
-                  type="button"
                   variant="link"
+                  className="p-0 h-auto font-semibold"
                   onClick={() => setIsLogin(!isLogin)}
-                  className="p-0 h-auto font-medium"
                 >
                   {isLogin ? 'Sign up' : 'Sign in'}
                 </Button>
               </p>
             </div>
 
-            {/* Public tracking link */}
+            {/* Forgot password link for login */}
             {isLogin && (
               <div className="mt-4 text-center">
-                <Link to="/track/demo">
-                  <Button variant="link" className="text-sm">
-                    Track a package without signing in
-                  </Button>
+                <Link
+                  to="/forgot-password"
+                  className="text-sm text-primary hover:text-primary/80 font-medium"
+                >
+                  Forgot your password?
                 </Link>
               </div>
             )}
@@ -246,7 +261,14 @@ const Login = () => {
         {/* Footer */}
         <div className="text-center">
           <p className="text-xs text-muted-foreground">
-            By continuing, you agree to our Terms of Service and Privacy Policy
+            By signing in, you agree to our{' '}
+            <Link to="/terms" className="text-primary hover:text-primary/80">
+              Terms of Service
+            </Link>{' '}
+            and{' '}
+            <Link to="/privacy" className="text-primary hover:text-primary/80">
+              Privacy Policy
+            </Link>
           </p>
         </div>
       </div>

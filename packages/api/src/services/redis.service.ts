@@ -1,17 +1,28 @@
 import { Redis } from '@upstash/redis';
 import IORedis from 'ioredis';
 
-// Upstash Redis client for serverless environments
-export const upstashRedis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
+// Upstash Redis client for serverless environments - lazy initialization
+let _upstashRedis: Redis | null = null;
+export const upstashRedis = {
+  get client() {
+    if (!_upstashRedis) {
+      _upstashRedis = new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL!,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+      });
+    }
+    return _upstashRedis;
+  }
+};
 
 // Traditional Redis client for local development or self-hosted Redis
-export const redis = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
-  retryDelayOnFailover: 100,
-  enableReadyCheck: false,
-  maxRetriesPerRequest: null,
+export const redis = new IORedis({
+  host: process.env.REDIS_HOST || 'localhost',
+  port: process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT, 10) : 6379,
+  password: process.env.REDIS_PASSWORD || undefined,
+  db: process.env.REDIS_DB ? parseInt(process.env.REDIS_DB, 10) : 0,
+  maxRetriesPerRequest: 3,
+  lazyConnect: true,
 });
 
 // Cache service with automatic fallback
@@ -20,13 +31,15 @@ export class CacheService {
 
   constructor() {
     // Use Upstash if credentials are provided, otherwise use local Redis
-    this.useUpstash = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+    this.useUpstash = !!(
+      process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+    );
   }
 
   async get(key: string): Promise<string | null> {
     try {
       if (this.useUpstash) {
-        return await upstashRedis.get(key);
+        return await upstashRedis.client.get(key);
       } else {
         return await redis.get(key);
       }
@@ -40,9 +53,9 @@ export class CacheService {
     try {
       if (this.useUpstash) {
         if (ttlSeconds) {
-          await upstashRedis.setex(key, ttlSeconds, value);
+          await upstashRedis.client.setex(key, ttlSeconds, value);
         } else {
-          await upstashRedis.set(key, value);
+          await upstashRedis.client.set(key, value);
         }
         return true;
       } else {
@@ -62,7 +75,7 @@ export class CacheService {
   async del(key: string): Promise<boolean> {
     try {
       if (this.useUpstash) {
-        await upstashRedis.del(key);
+        await upstashRedis.client.del(key);
       } else {
         await redis.del(key);
       }
@@ -76,7 +89,7 @@ export class CacheService {
   async exists(key: string): Promise<boolean> {
     try {
       if (this.useUpstash) {
-        const result = await upstashRedis.exists(key);
+        const result = await upstashRedis.client.exists(key);
         return result === 1;
       } else {
         const result = await redis.exists(key);
@@ -91,9 +104,9 @@ export class CacheService {
   async increment(key: string, ttlSeconds?: number): Promise<number> {
     try {
       if (this.useUpstash) {
-        const result = await upstashRedis.incr(key);
+        const result = await upstashRedis.client.incr(key);
         if (ttlSeconds) {
-          await upstashRedis.expire(key, ttlSeconds);
+          await upstashRedis.client.expire(key, ttlSeconds);
         }
         return result;
       } else {
@@ -112,7 +125,7 @@ export class CacheService {
   async setHash(key: string, field: string, value: string): Promise<boolean> {
     try {
       if (this.useUpstash) {
-        await upstashRedis.hset(key, { [field]: value });
+        await upstashRedis.client.hset(key, { [field]: value });
       } else {
         await redis.hset(key, field, value);
       }
@@ -126,7 +139,7 @@ export class CacheService {
   async getHash(key: string, field: string): Promise<string | null> {
     try {
       if (this.useUpstash) {
-        return await upstashRedis.hget(key, field);
+        return await upstashRedis.client.hget(key, field);
       } else {
         return await redis.hget(key, field);
       }
@@ -139,7 +152,7 @@ export class CacheService {
   async getAllHash(key: string): Promise<Record<string, string> | null> {
     try {
       if (this.useUpstash) {
-        return await upstashRedis.hgetall(key);
+        return await upstashRedis.client.hgetall(key);
       } else {
         return await redis.hgetall(key);
       }
@@ -152,7 +165,7 @@ export class CacheService {
   async publish(channel: string, message: string): Promise<boolean> {
     try {
       if (this.useUpstash) {
-        await upstashRedis.publish(channel, message);
+        await upstashRedis.client.publish(channel, message);
       } else {
         await redis.publish(channel, message);
       }
@@ -164,7 +177,11 @@ export class CacheService {
   }
 
   // Session management
-  async setSession(sessionId: string, data: any, ttlSeconds: number = 3600): Promise<boolean> {
+  async setSession(
+    sessionId: string,
+    data: any,
+    ttlSeconds: number = 3600
+  ): Promise<boolean> {
     return this.set(`session:${sessionId}`, JSON.stringify(data), ttlSeconds);
   }
 
@@ -178,15 +195,19 @@ export class CacheService {
   }
 
   // Rate limiting
-  async checkRateLimit(key: string, limit: number, windowSeconds: number): Promise<{ allowed: boolean; remaining: number; resetTime: number }> {
+  async checkRateLimit(
+    key: string,
+    limit: number,
+    windowSeconds: number
+  ): Promise<{ allowed: boolean; remaining: number; resetTime: number }> {
     const current = await this.increment(`rate_limit:${key}`, windowSeconds);
     const remaining = Math.max(0, limit - current);
-    const resetTime = Date.now() + (windowSeconds * 1000);
-    
+    const resetTime = Date.now() + windowSeconds * 1000;
+
     return {
       allowed: current <= limit,
       remaining,
-      resetTime
+      resetTime,
     };
   }
 }

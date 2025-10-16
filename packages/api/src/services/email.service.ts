@@ -7,11 +7,11 @@ export class EmailService {
     return new Resend(apiKey);
   }
 
-  static async sendDriverInvite(email: string, name: string, inviteUrl: string) {
+  static async sendDriverInvite(email: string, name: string, inviteUrl: string, customMessage?: string) {
     const from = process.env.EMAIL_FROM || 'no-reply@zoneflow.app';
     const client = this.getClient();
     const subject = 'You have been invited to ZoneFlow';
-    const html = this.renderInviteHtml(name, inviteUrl);
+    const html = this.renderInviteHtml(name, inviteUrl, customMessage);
     if (process.env.NODE_ENV !== 'production' && process.env.RESEND_API_KEY === undefined) {
       // Dev preview: log the invite link
       console.log(`[DEV] Invite email to ${email}: ${inviteUrl}`);
@@ -48,7 +48,11 @@ export class EmailService {
     return html;
   }
 
-  private static renderInviteHtml(name: string, url: string): string {
+  private static renderInviteHtml(name: string, url: string, customMessage?: string): string {
+    const messageSection = customMessage 
+      ? `<p style="margin:0 0 16px; padding:12px; background:#f8fafc; border-left:4px solid #0ea5e9; border-radius:4px;"><em>"${customMessage}"</em></p>`
+      : '';
+    
     return `
 <!doctype html>
 <html>
@@ -57,6 +61,7 @@ export class EmailService {
       <h1 style="font-size:20px; margin:0 0 12px;">You're invited to ZoneFlow</h1>
       <p style="margin:0 0 16px;">Hi ${name},</p>
       <p style="margin:0 0 16px;">You've been invited to join ZoneFlow as a driver. Click the button below to set your password and activate your account.</p>
+      ${messageSection}
       <p style="margin:24px 0;">
         <a href="${url}" style="display:inline-block; background:#0ea5e9; color:#fff; text-decoration:none; padding:10px 16px; border-radius:8px;">Set your password</a>
       </p>

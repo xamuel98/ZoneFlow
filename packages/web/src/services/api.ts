@@ -2,6 +2,8 @@ import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import { useAuthStore } from '../stores/auth.store';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_VERSION = import.meta.env.VITE_API_VERSION || 'v1';
+const USE_VERSIONED_API = import.meta.env.VITE_USE_VERSIONED_API !== 'false';
 
 // API response interfaces
 interface ApiSuccessResponse<T = any> {
@@ -100,49 +102,80 @@ class ApiService {
     );
   }
 
+  // Helper method to build versioned URLs
+  private buildUrl(endpoint: string): string {
+    // If endpoint already starts with /api/, use as-is for backward compatibility
+    if (endpoint.startsWith('/api/')) {
+      return endpoint;
+    }
+    
+    // If endpoint starts with /, remove it
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+    
+    // Build versioned URL if versioning is enabled
+    if (USE_VERSIONED_API) {
+      return `/api/${API_VERSION}/${cleanEndpoint}`;
+    }
+    
+    // Fallback to legacy format
+    return `/api/${cleanEndpoint}`;
+  }
+
+  // Helper method for public API URLs
+  private buildPublicUrl(endpoint: string): string {
+    const versionedUrl = this.buildUrl(endpoint);
+    return `${API_BASE_URL}${versionedUrl}`;
+  }
+
   async get<T>(url: string, params?: any): Promise<T> {
+    const versionedUrl = this.buildUrl(url);
     const response: AxiosResponse<ApiSuccessResponse<T>> = await this.api.get(
-      url,
+      versionedUrl,
       { params }
     );
     return response.data.data;
   }
 
   async post<T>(url: string, data?: any): Promise<T> {
+    const versionedUrl = this.buildUrl(url);
     const response: AxiosResponse<ApiSuccessResponse<T>> = await this.api.post(
-      url,
+      versionedUrl,
       data
     );
     return response.data.data;
   }
 
   async put<T>(url: string, data?: any): Promise<T> {
+    const versionedUrl = this.buildUrl(url);
     const response: AxiosResponse<ApiSuccessResponse<T>> = await this.api.put(
-      url,
+      versionedUrl,
       data
     );
     return response.data.data;
   }
 
   async patch<T>(url: string, data?: any): Promise<T> {
+    const versionedUrl = this.buildUrl(url);
     const response: AxiosResponse<ApiSuccessResponse<T>> = await this.api.patch(
-      url,
+      versionedUrl,
       data
     );
     return response.data.data;
   }
 
   async delete<T>(url: string): Promise<T> {
+    const versionedUrl = this.buildUrl(url);
     const response: AxiosResponse<ApiSuccessResponse<T>> =
-      await this.api.delete(url);
+      await this.api.delete(versionedUrl);
     return response.data.data;
   }
 
   // Public API calls (without auth)
   async publicGet<T>(url: string, params?: any): Promise<T> {
     try {
+      const fullUrl = this.buildPublicUrl(url);
       const response: AxiosResponse<ApiResponse<T>> = await axios.get(
-        `${API_BASE_URL}${url}`,
+        fullUrl,
         { params }
       );
 
@@ -176,8 +209,9 @@ class ApiService {
 
   async publicPost<T>(url: string, data?: any): Promise<T> {
     try {
+      const fullUrl = this.buildPublicUrl(url);
       const response: AxiosResponse<ApiResponse<T>> = await axios.post(
-        `${API_BASE_URL}${url}`,
+        fullUrl,
         data
       );
 

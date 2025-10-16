@@ -7,7 +7,7 @@ export const registerSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
   name: z.string().min(2, 'Name must be at least 2 characters'),
   role: z.enum(['business_owner', 'driver'], {
-    errorMap: () => ({ message: 'Role must be business_owner or driver' })
+    message: 'Role must be business_owner or driver'
   }),
   phone: z.string().optional(),
 });
@@ -86,8 +86,14 @@ export const validateRequest = <T>(schema: z.ZodSchema<T>, data: unknown): T => 
     return schema.parse(data);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const message = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
-      throw new ValidationError(`Validation failed: ${message}`);
+      // Check if error.issues exists and is an array before calling map
+      if (error.issues && Array.isArray(error.issues)) {
+        const message = error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ');
+        throw new ValidationError(`Validation failed: ${message}`);
+      } else {
+        // Fallback error message when error.issues is not available
+        throw new ValidationError(`Validation failed: ${error.message || 'Invalid data format'}`);
+      }
     }
     throw error;
   }
@@ -103,6 +109,27 @@ export const updateGeofenceSchema = createGeofenceSchema.partial();
 export const acceptInviteSchema = z.object({
   token: z.string().min(10, 'Invalid token'),
   password: z.string().min(8, 'Password must be at least 8 characters')
+});
+
+// Driver invitation validation schemas
+export const createInvitationSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  phone: z.string().optional(),
+  vehicleType: z.string().optional(),
+  licensePlate: z.string().optional(),
+  expiresInDays: z.number().min(1).max(365, 'Expiration must be between 1 and 365 days').default(7),
+  message: z.string().optional(),
+});
+
+export const bulkCancelInvitationsSchema = z.object({
+  invitationIds: z.array(z.string()).min(1, 'At least one invitation ID is required'),
+});
+
+export const invitationListFilterSchema = z.object({
+  status: z.enum(['pending', 'accepted', 'cancelled', 'expired']).optional(),
+  page: z.number().min(1).default(1),
+  limit: z.number().min(1).max(100).default(10),
 });
 
 // Orders list filter schema

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   RiBox3Line,
@@ -37,6 +37,8 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
+import { useNotifications } from '../components/ui/notification-system';
+import EnhancedLoading from '../components/ui/enhanced-loading';
 
 interface DashboardStats {
   totalOrders: number;
@@ -67,7 +69,7 @@ interface DashboardStats {
 }
 
 interface MapData {
-  orders: any[];
+  activeOrders: any[];
   drivers: any[];
   geofences: any[];
 }
@@ -76,49 +78,79 @@ const Dashboard = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [mapData, setMapData] = useState<MapData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { user } = useAuthStore();
+  const notifications = useNotifications();
+
+  // Memoize the error notification function to prevent re-renders
+  const showErrorNotification = useCallback((errorMessage: string, retryFn: () => void) => {
+    notifications.error('Failed to load dashboard data', {
+      description: errorMessage,
+      action: {
+        label: 'Retry',
+        onClick: retryFn,
+      },
+    });
+  }, [notifications.error]);
 
   useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        const [statsData, mapDataResult] = await Promise.all([
+          dashboardService.getStats(),
+          dashboardService.getMapData(),
+        ]);
+
+        setStats(statsData);
+        setMapData(mapDataResult);
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load dashboard data';
+        setError(errorMessage);
+        showErrorNotification(errorMessage, () => loadDashboardData());
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
-    try {
-      const [statsData, mapDataResponse] = await Promise.all([
-        dashboardService.getStats(),
-        dashboardService.getMapData(),
-      ]);
-
-      setStats(statsData);
-      setMapData(mapDataResponse);
-    } catch (error: any) {
-      toast.error('Failed to load dashboard data');
-      console.error('Dashboard error:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, []); // Empty dependency array - only run once on mount
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <LoadingSpinner size="lg" />
-      </div>
+      <EnhancedLoading
+        size="lg"
+        text="Loading dashboard..."
+        className="min-h-[400px]"
+      />
     );
   }
 
-  if (!stats) {
+  if (error || !stats) {
     return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">Failed to load dashboard data</p>
-        <Button onClick={loadDashboardData} className="mt-4">
-          Retry
-        </Button>
+      <div className="min-h-[400px] flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle>Unable to load dashboard</CardTitle>
+            <CardDescription>
+              {error || 'An unexpected error occurred'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button 
+              onClick={() => window.location.reload()} 
+              className="w-full"
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
-
-
 
   return (
     <div className="">
@@ -273,8 +305,8 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid auto-rows-min grid-cols-1 2xl:grid-cols-3">
+      {/* Main Content Grid - Optimized layout */}
+      <div className="grid auto-rows-min grid-cols-1 2xl:grid-cols-3 gap-0">
         {/* Map */}
         <div className="lg:col-span-3">
           <Card className='border-x-0 border-border'>
@@ -287,7 +319,7 @@ const Dashboard = () => {
             <CardContent>
               {mapData ? (
                 <Map
-                  orders={mapData.orders}
+                  orders={mapData.activeOrders}
                   drivers={mapData.drivers}
                   geofences={mapData.geofences}
                   height="400px"
@@ -366,7 +398,8 @@ const Dashboard = () => {
         {/* </div> */}
       </div>
 
-      <div className="grid auto-rows-min 2xl:grid-cols-2 *:-ms-px *:-mt-px -m-px">
+      {/* Charts Grid - Optimized without negative margins */}
+      <div className="grid auto-rows-min 2xl:grid-cols-2 gap-0">
         {/* Delivery Performance Chart */}
         <DeliveryPerformanceChart />
 
@@ -374,8 +407,8 @@ const Dashboard = () => {
         <ChartOrderStatus orderMetrics={stats.orderMetrics} />
       </div>
 
-      {/* Top Drivers */}
-      <Card className="mt-px border-x-0 border-b-0">
+      {/* Top Drivers - Optimized layout */}
+      <Card className="border-x-0 border-b-0" style={{ willChange: 'auto' }}>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Top Drivers</CardTitle>
@@ -406,7 +439,7 @@ const Dashboard = () => {
                       </Link>
                     </TableCell>
                     <TableCell>{driver.completedOrders}</TableCell>
-                    <TableCell>{driver.avgRating.toFixed(1)}</TableCell>
+                    {/* <TableCell>{driver.avgRating.toFixed(1)}</TableCell> */}
                   </TableRow>
                 ))}
               </TableBody>

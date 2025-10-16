@@ -1,4 +1,4 @@
-import { Server as SocketIOServer } from 'socket.io';
+import { Socket, Server as SocketIOServer } from 'socket.io';
 import { Server as HTTPServer } from 'http';
 import { cacheService } from './redis.service.js';
 import jwt from 'jsonwebtoken';

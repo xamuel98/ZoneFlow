@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
+import { Checkbox } from '../ui/checkbox';
 import {
   Table,
   TableBody,
@@ -33,7 +34,10 @@ import {
   MapPin,
   Clock,
   Upload,
-  Filter
+  Filter,
+  Mail,
+  Users,
+  Download
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -42,12 +46,17 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import { toast } from 'sonner';
+import { BulkOperationsDialog } from './bulk-operations-dialog';
+import ImportDriversDialog from './import-drivers-dialog';
 import type { Driver } from '@zoneflow/shared';
 
 const DriverList = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedDrivers, setSelectedDrivers] = useState<Driver[]>([]);
+  const [showBulkOperations, setShowBulkOperations] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   
   const {
     drivers,
@@ -77,6 +86,22 @@ const DriverList = () => {
     }
   };
 
+  const handleSelectDriver = (driver: Driver, checked: boolean) => {
+    if (checked) {
+      setSelectedDrivers(prev => [...prev, driver]);
+    } else {
+      setSelectedDrivers(prev => prev.filter(d => d.id !== driver.id));
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedDrivers(drivers);
+    } else {
+      setSelectedDrivers([]);
+    }
+  };
+
   const handleEdit = (driver: Driver) => {
     navigate(`/drivers/edit/${driver.id}`);
   };
@@ -95,6 +120,16 @@ const DriverList = () => {
   const handlePageChange = (page: number) => {
     setPagination({ page });
     fetchDrivers({ page });
+    setSelectedDrivers([]); // Clear selection on page change
+  };
+
+  const handleBulkOperationsSuccess = () => {
+    setSelectedDrivers([]);
+    fetchDrivers();
+  };
+
+  const handleImportSuccess = () => {
+    fetchDrivers();
   };
 
   const getStatusBadge = (status: Driver['status']) => {
@@ -138,215 +173,263 @@ const DriverList = () => {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Driver Management</CardTitle>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => navigate('/drivers/import')}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Import
-            </Button>
-            <Button onClick={() => navigate('/drivers/create')}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Driver
-            </Button>
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Driver Management</CardTitle>
+            <div className="flex gap-2">
+              {selectedDrivers.length > 0 && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowBulkOperations(true)}
+                  className="gap-2"
+                >
+                  <Users className="h-4 w-4" />
+                  Bulk Actions ({selectedDrivers.length})
+                </Button>
+              )}
+              <Button 
+                variant="outline" 
+                onClick={() => setShowImportDialog(true)}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Import
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('?invite=true')}
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                Invite Driver
+              </Button>
+              <Button onClick={() => navigate('/drivers/create')}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Driver
+              </Button>
+            </div>
           </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {/* Search and Filters */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search drivers..."
-              value={searchTerm}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="pl-10"
-            />
+        </CardHeader>
+        <CardContent>
+          {/* Search and Filters */}
+          <div className="flex items-center gap-4 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search drivers..."
+                value={searchTerm}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={handleStatusFilter}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="available">Available</SelectItem>
+                <SelectItem value="busy">Busy</SelectItem>
+                <SelectItem value="offline">Offline</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={statusFilter} onValueChange={handleStatusFilter}>
-            <SelectTrigger className="w-[180px]">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="available">Available</SelectItem>
-              <SelectItem value="busy">Busy</SelectItem>
-              <SelectItem value="offline">Offline</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
 
-        {/* Drivers Table */}
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Driver</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Vehicle</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Last Seen</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {drivers.length === 0 ? (
+          {/* Drivers Table */}
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
-                    <div className="text-muted-foreground">
-                      <User className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>No drivers found</p>
-                      <p className="text-sm">Add your first driver to get started</p>
-                    </div>
-                  </TableCell>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectedDrivers.length === drivers.length && drivers.length > 0}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all drivers"
+                    />
+                  </TableHead>
+                  <TableHead>Driver</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Vehicle</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Last Seen</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ) : (
-                drivers.map((driver) => (
-                  <TableRow key={driver.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                          <User className="h-4 w-4 text-primary" />
-                        </div>
-                        <div>
-                          <div className="font-medium">{driver.name}</div>
-                          <div className="text-sm text-muted-foreground">{driver.email}</div>
-                        </div>
+              </TableHeader>
+              <TableBody>
+                {drivers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8">
+                      <div className="text-muted-foreground">
+                        <User className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>No drivers found</p>
+                        <p className="text-sm">Add your first driver to get started</p>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <div>{driver.phone}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Car className="h-4 w-4 text-muted-foreground" />
-                        <div className="text-sm">
-                          <div>{driver.vehicle_type || 'Not specified'}</div>
-                          {driver.license_plate && (
-                            <div className="text-xs text-muted-foreground">
-                              {driver.license_plate}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(driver.is_available ? 'available' : 'offline')}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        {driver.current_lat && driver.current_lng ? (
-                          <>
-                            <MapPin className="h-4 w-4 text-gray-400" />
-                            <span>
-                              {driver.current_lat.toFixed(4)}, {driver.current_lng.toFixed(4)}
-                            </span>
-                          </>
-                        ) : (
-                          <span>Location unknown</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4 text-gray-400" />
-                        <span>{formatLastSeen(driver.last_location_update)}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEdit(driver)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => handleDelete(driver)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                ) : (
+                  drivers.map((driver) => (
+                    <TableRow key={driver.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedDrivers.some(d => d.id === driver.id)}
+                          onCheckedChange={(checked) => handleSelectDriver(driver, checked as boolean)}
+                          aria-label={`Select driver ${driver.name}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <User className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <div className="font-medium">{driver.name}</div>
+                            <div className="text-sm text-muted-foreground">{driver.email}</div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          <div>{driver.phone}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Car className="h-4 w-4 text-muted-foreground" />
+                          <div className="text-sm">
+                            <div>{driver.vehicle_type || 'Not specified'}</div>
+                            {driver.license_plate && (
+                              <div className="text-xs text-muted-foreground">
+                                {driver.license_plate}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {getStatusBadge(driver.is_available ? 'available' : 'offline')}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          {driver.current_lat && driver.current_lng ? (
+                            <>
+                              <MapPin className="h-4 w-4 text-gray-400" />
+                              <span>
+                                {driver.current_lat.toFixed(4)}, {driver.current_lng.toFixed(4)}
+                              </span>
+                            </>
+                          ) : (
+                            <span>Location unknown</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4 text-gray-400" />
+                          <span>{formatLastSeen(driver.last_location_update)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEdit(driver)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleDelete(driver)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
         {/* Pagination */}
-        {pagination.pages > 1 && (
-          <div className="flex items-center justify-between mt-4">
-            <div className="text-sm text-muted-foreground">
-              Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
-              {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
-              {pagination.total} drivers
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(pagination.page - 1)}
-                disabled={pagination.page <= 1}
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Previous
-              </Button>
-              <div className="flex items-center gap-1">
-                {Array.from({ length: pagination.pages }, (_, i) => i + 1)
-                  .filter(page => 
-                    page === 1 || 
-                    page === pagination.pages || 
-                    Math.abs(page - pagination.page) <= 1
-                  )
-                  .map((page, index, array) => (
-                    <div key={page} className="flex items-center">
-                      {index > 0 && array[index - 1] !== page - 1 && (
-                        <span className="px-2 text-muted-foreground">...</span>
-                      )}
-                      <Button
-                        variant={page === pagination.page ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => handlePageChange(page)}
-                        className="w-8 h-8 p-0"
-                      >
-                        {page}
-                      </Button>
-                    </div>
-                  ))}
+          {pagination.pages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <div className="text-sm text-muted-foreground">
+                Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
+                {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
+                {pagination.total} drivers
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(pagination.page + 1)}
-                disabled={pagination.page >= pagination.pages}
-              >
-                Next
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={pagination.page <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: pagination.pages }, (_, i) => i + 1)
+                    .filter(page => 
+                      page === 1 || 
+                      page === pagination.pages || 
+                      Math.abs(page - pagination.page) <= 1
+                    )
+                    .map((page, index, array) => (
+                      <div key={page} className="flex items-center">
+                        {index > 0 && array[index - 1] !== page - 1 && (
+                          <span className="px-2 text-muted-foreground">...</span>
+                        )}
+                        <Button
+                          variant={page === pagination.page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(page)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {page}
+                        </Button>
+                      </div>
+                    ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={pagination.page >= pagination.pages}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Bulk Operations Dialog */}
+      <BulkOperationsDialog
+        open={showBulkOperations}
+        onOpenChange={setShowBulkOperations}
+        selectedDrivers={selectedDrivers}
+        onSuccess={handleBulkOperationsSuccess}
+      />
+
+      {/* Import Dialog */}
+      <ImportDriversDialog
+        open={showImportDialog}
+        onOpenChange={setShowImportDialog}
+        onSuccess={handleImportSuccess}
+      />
+    </>
   );
 };
 
